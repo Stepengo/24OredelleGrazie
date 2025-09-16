@@ -258,6 +258,25 @@
             color: #000;
         }
         
+        .controls {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 999;
+        }
+        
+        .controls button {
+            padding: 10px;
+            border-radius: 50px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            min-width: 120px;
+        }
+        
         @media (max-width: 768px) {
             .nav {
                 flex-direction: column;
@@ -270,6 +289,15 @@
             
             .vs {
                 margin: 10px 0;
+            }
+            
+            .controls {
+                position: relative;
+                bottom: auto;
+                right: auto;
+                margin-top: 20px;
+                flex-direction: row;
+                justify-content: center;
             }
         }
     </style>
@@ -375,6 +403,14 @@
             <div id="matchResult"></div>
         </div>
     </div>
+    
+    <!-- Controlli extra -->
+    <div class="controls">
+        <button class="btn" onclick="exportData()" title="Esporta dati">💾 Esporta</button>
+        <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display: none;">
+        <button class="btn" onclick="document.getElementById('importFile').click()" title="Importa dati">📥 Importa</button>
+        <button class="btn btn-danger" onclick="resetAllData()" title="Reset tutti i dati">🗑️ Reset</button>
+    </div>
 
     <script>
         // Dati globali
@@ -433,6 +469,11 @@
 
         function displayTeams() {
             const teamsList = document.getElementById('teamsList');
+            if (teams.length === 0) {
+                teamsList.innerHTML = '<div class="card"><p>Nessuna squadra presente. Aggiungi la prima squadra!</p></div>';
+                return;
+            }
+            
             teamsList.innerHTML = teams.map(team => `
                 <div class="card">
                     <h3>${team.name}</h3>
@@ -441,7 +482,7 @@
                         ${team.players.map(player => `
                             <div class="player-stat">
                                 <strong>${player.name}</strong><br>
-                                <small>${player.position}</small>
+                                <small>${player.position || 'Giocatore'}</small>
                             </div>
                         `).join('')}
                     </div>
@@ -457,6 +498,9 @@
                 saveData();
                 updateTeamSelects();
                 displayTeams();
+                displayMatches();
+                displayStandings();
+                displayStats();
             }
         }
 
@@ -512,7 +556,12 @@
             const team2Id = parseInt(document.getElementById('team2').value);
             const matchDate = document.getElementById('matchDate').value;
 
-            if (!team1Id || !team2Id || team1Id === team2Id) {
+            if (!team1Id || !team2Id) {
+                alert('Seleziona entrambe le squadre');
+                return;
+            }
+
+            if (team1Id === team2Id) {
                 alert('Seleziona due squadre diverse');
                 return;
             }
@@ -521,8 +570,8 @@
                 id: Date.now(),
                 team1Id: team1Id,
                 team2Id: team2Id,
-                date: matchDate,
-                status: 'scheduled', // scheduled, completed
+                date: matchDate || new Date().toISOString(),
+                status: 'scheduled',
                 result: {
                     team1Score: 0,
                     team2Score: 0,
@@ -541,20 +590,27 @@
 
         function displayMatches() {
             const matchesList = document.getElementById('matchesList');
+            if (matches.length === 0) {
+                matchesList.innerHTML = '<div class="card"><p>Nessuna partita programmata.</p></div>';
+                return;
+            }
+            
             matchesList.innerHTML = matches.map(match => {
                 const team1 = teams.find(t => t.id === match.team1Id);
                 const team2 = teams.find(t => t.id === match.team2Id);
+                
+                if (!team1 || !team2) return '';
                 
                 return `
                     <div class="card match-card">
                         <div class="match-details">
                             <div class="team-score">
-                                <h3>${team1 ? team1.name : 'Squadra eliminata'}</h3>
+                                <h3>${team1.name}</h3>
                                 ${match.status === 'completed' ? `<h2>${match.result.team1Score}</h2>` : ''}
                             </div>
                             <div class="vs">VS</div>
                             <div class="team-score">
-                                <h3>${team2 ? team2.name : 'Squadra eliminata'}</h3>
+                                <h3>${team2.name}</h3>
                                 ${match.status === 'completed' ? `<h2>${match.result.team2Score}</h2>` : ''}
                             </div>
                         </div>
@@ -652,11 +708,9 @@
             const team1 = teams.find(t => t.id === match.team1Id);
             const team2 = teams.find(t => t.id === match.team2Id);
 
-            // Salva i punteggi
             match.result.team1Score = parseInt(document.getElementById('team1Score').value) || 0;
             match.result.team2Score = parseInt(document.getElementById('team2Score').value) || 0;
 
-            // Salva le statistiche dei giocatori
             match.result.team1Stats = {};
             match.result.team2Stats = {};
 
@@ -679,6 +733,7 @@
             displayStandings();
             displayStats();
             closeResultModal();
+            alert('Risultato salvato con successo!');
         }
 
         // Classifica
@@ -686,6 +741,11 @@
             const standings = calculateStandings();
             
             const standingsTable = document.getElementById('standingsTable');
+            if (standings.length === 0) {
+                standingsTable.innerHTML = '<div class="card"><p>Nessuna classifica disponibile. Aggiungi squadre e partite!</p></div>';
+                return;
+            }
+            
             standingsTable.innerHTML = `
                 <table class="table">
                     <thead>
@@ -714,7 +774,7 @@
                                 <td>${team.losses}</td>
                                 <td>${team.goalsFor}</td>
                                 <td>${team.goalsAgainst}</td>
-                                <td>${team.goalDifference > 0 ? '+' : ''}${team.goalDifference}</td>
+                                <td style="color: ${team.goalDifference > 0 ? 'green' : team.goalDifference < 0 ? 'red' : 'black'}">${team.goalDifference > 0 ? '+' : ''}${team.goalDifference}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -777,9 +837,9 @@
 
         // Statistiche
         function displayStats() {
-            const totalMatches = matches.filter(m => m.status === 'completed').length;
-            const totalGoals = matches.filter(m => m.status === 'completed')
-                .reduce((sum, match) => sum + match.result.team1Score + match.result.team2Score, 0);
+            const completedMatches = matches.filter(m => m.status === 'completed');
+            const totalMatches = completedMatches.length;
+            const totalGoals = completedMatches.reduce((sum, match) => sum + match.result.team1Score + match.result.team2Score, 0);
             const totalTeams = teams.length;
             const totalPlayers = teams.reduce((sum, team) => sum + team.players.length, 0);
 
@@ -802,17 +862,274 @@
                 </div>
             `;
 
-            // Statistiche giocatori
             const playerStats = calculatePlayerStats();
             
+            if (playerStats.length === 0) {
+                document.getElementById('playerStats').innerHTML = '<div class="card"><p>Nessuna statistica disponibile. Completa alcune partite!</p></div>';
+                return;
+            }
+            
             document.getElementById('playerStats').innerHTML = `
-                <h3>Top Marcatori</h3>
+                <h3>🥅 Top Marcatori</h3>
                 <table class="table">
                     <thead>
                         <tr>
+                            <th>Pos</th>
                             <th>Giocatore</th>
                             <th>Squadra</th>
                             <th>Gol</th>
                             <th>Scalpi</th>
                             <th>Partite</th>
+                            <th>Media Gol</th>
                         </tr>
+                    </thead>
+                    <tbody>
+                        ${playerStats.slice(0, 10).map((player, index) => `
+                            <tr>
+                                <td><strong>${index + 1}</strong></td>
+                                <td><strong>${player.name}</strong></td>
+                                <td>${player.teamName}</td>
+                                <td>${player.totalGoals}</td>
+                                <td>${player.totalScalps}</td>
+                                <td>${player.matchesPlayed}</td>
+                                <td>${player.matchesPlayed > 0 ? (player.totalGoals / player.matchesPlayed).toFixed(1) : '0.0'}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+                
+                <h3>🏆 Top Scalpi</h3>
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>Pos</th>
+                            <th>Giocatore</th>
+                            <th>Squadra</th>
+                            <th>Scalpi</th>
+                            <th>Gol</th>
+                            <th>Partite</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${playerStats.sort((a, b) => b.totalScalps - a.totalScalps).slice(0, 10).map((player, index) => `
+                            <tr>
+                                <td><strong>${index + 1}</strong></td>
+                                <td><strong>${player.name}</strong></td>
+                                <td>${player.teamName}</td>
+                                <td>${player.totalScalps}</td>
+                                <td>${player.totalGoals}</td>
+                                <td>${player.matchesPlayed}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+            `;
+        }
+
+        function calculatePlayerStats() {
+            const playerStats = [];
+            
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    let totalGoals = 0;
+                    let totalScalps = 0;
+                    let matchesPlayed = 0;
+
+                    matches.filter(match => match.status === 'completed').forEach(match => {
+                        let playerMatchStats = null;
+                        
+                        if (match.team1Id === team.id && match.result.team1Stats[player.id]) {
+                            playerMatchStats = match.result.team1Stats[player.id];
+                            if (playerMatchStats.goals > 0 || playerMatchStats.scalps > 0) {
+                                matchesPlayed++;
+                            }
+                        } else if (match.team2Id === team.id && match.result.team2Stats[player.id]) {
+                            playerMatchStats = match.result.team2Stats[player.id];
+                            if (playerMatchStats.goals > 0 || playerMatchStats.scalps > 0) {
+                                matchesPlayed++;
+                            }
+                        }
+                        
+                        if (playerMatchStats) {
+                            totalGoals += playerMatchStats.goals || 0;
+                            totalScalps += playerMatchStats.scalps || 0;
+                        }
+                    });
+
+                    if (totalGoals > 0 || totalScalps > 0) {
+                        playerStats.push({
+                            name: player.name,
+                            teamName: team.name,
+                            totalGoals,
+                            totalScalps,
+                            matchesPlayed
+                        });
+                    }
+                });
+            });
+
+            return playerStats.sort((a, b) => {
+                if (b.totalGoals !== a.totalGoals) return b.totalGoals - a.totalGoals;
+                return b.totalScalps - a.totalScalps;
+            });
+        }
+
+        // Event listeners per chiudere i modal
+        window.onclick = function(event) {
+            const playerModal = document.getElementById('playerModal');
+            const resultModal = document.getElementById('resultModal');
+            
+            if (event.target === playerModal) {
+                closePlayerModal();
+            }
+            if (event.target === resultModal) {
+                closeResultModal();
+            }
+        }
+
+        // Funzioni di utilità per l'export/import dei dati
+        function exportData() {
+            const data = {
+                teams: teams,
+                matches: matches,
+                exported: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            const dataStr = JSON.stringify(data, null, 2);
+            const dataBlob = new Blob([dataStr], {type: 'application/json'});
+            
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(dataBlob);
+            link.download = `torneo_pallascout_${new Date().toISOString().slice(0,10)}.json`;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            
+            alert('Dati esportati con successo!');
+        }
+
+        function importData(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const data = JSON.parse(e.target.result);
+                    if (data.teams && data.matches) {
+                        if (confirm('Importare questi dati? I dati attuali verranno sovrascritti.')) {
+                            teams = data.teams;
+                            matches = data.matches;
+                            saveData();
+                            updateTeamSelects();
+                            displayTeams();
+                            displayMatches();
+                            displayStandings();
+                            displayStats();
+                            alert('Dati importati con successo!');
+                        }
+                    } else {
+                        alert('File non valido! Assicurati di importare un file esportato dall\'applicazione.');
+                    }
+                } catch (error) {
+                    alert('Errore nel caricamento del file! Verifica che sia un file JSON valido.');
+                }
+            };
+            reader.readAsText(file);
+            event.target.value = ''; // Reset input
+        }
+
+        // Backup automatico
+        function autoBackup() {
+            const backupData = {
+                teams: teams,
+                matches: matches,
+                timestamp: Date.now()
+            };
+            
+            localStorage.setItem('pallascout_auto_backup', JSON.stringify(backupData));
+        }
+
+        // Salva backup ogni 5 minuti
+        setInterval(autoBackup, 300000);
+
+        // Ripristina da backup automatico se necessario
+        function restoreFromAutoBackup() {
+            const backup = localStorage.getItem('pallascout_auto_backup');
+            if (backup && teams.length === 0 && matches.length === 0) {
+                try {
+                    const backupData = JSON.parse(backup);
+                    const backupDate = new Date(backupData.timestamp);
+                    
+                    if (confirm(`Trovato backup automatico del ${backupDate.toLocaleString('it-IT')}. Vuoi ripristinarlo?`)) {
+                        teams = backupData.teams || [];
+                        matches = backupData.matches || [];
+                        saveData();
+                        updateTeamSelects();
+                        displayTeams();
+                        displayMatches();
+                        displayStandings();
+                        displayStats();
+                    }
+                } catch (error) {
+                    console.log('Errore nel ripristino del backup automatico');
+                }
+            }
+        }
+
+        // Controlla backup al caricamento
+        setTimeout(restoreFromAutoBackup, 1000);
+
+        // Funzione per resettare tutti i dati
+        function resetAllData() {
+            if (confirm('⚠️ ATTENZIONE: Questa operazione cancellerà tutti i dati del torneo (squadre, giocatori, partite, risultati). Sei sicuro?')) {
+                if (confirm('❌ Conferma di voler cancellare DEFINITIVAMENTE tutti i dati? Questa operazione non può essere annullata!')) {
+                    teams = [];
+                    matches = [];
+                    localStorage.removeItem('pallascout_teams');
+                    localStorage.removeItem('pallascout_matches');
+                    localStorage.removeItem('pallascout_auto_backup');
+                    
+                    updateTeamSelects();
+                    displayTeams();
+                    displayMatches();
+                    displayStandings();
+                    displayStats();
+                    
+                    alert('✅ Tutti i dati sono stati cancellati. Puoi iniziare un nuovo torneo!');
+                }
+            }
+        }
+
+        // Aggiungi event listener per Enter nei form
+        document.getElementById('teamName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addTeam();
+            }
+        });
+
+        document.getElementById('playerName').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                addPlayer();
+            }
+        });
+
+        // Validazione in tempo reale
+        document.getElementById('teamName').addEventListener('input', function(e) {
+            const btn = document.querySelector('button[onclick="addTeam()"]');
+            if (e.target.value.trim()) {
+                btn.style.opacity = '1';
+                btn.style.cursor = 'pointer';
+            } else {
+                btn.style.opacity = '0.5';
+                btn.style.cursor = 'not-allowed';
+            }
+        });
+
+        console.log('🏆 Gestionale Torneo Pallascout caricato con successo!');
+        console.log('📊 Teams:', teams.length);
+        console.log('⚽ Matches:', matches.length);
+    </script>
+</body>
+</html>
