@@ -534,8 +534,8 @@
         // Configurazione globale
         const CONFIG = {
             apiUrl: localStorage.getItem('pallascout_api_url') || '',
-            autoSync: true,
-            syncInterval: 30000 // 30 secondi
+            autoSync: false, // DISABILITATO per evitare problemi
+            syncInterval: 60000 // Solo se abilitato manualmente
         };
         
         // Dati globali
@@ -555,12 +555,14 @@
             updateUI();
             checkApiConfiguration();
             
-            if (CONFIG.apiUrl) {
+            // NON caricare automaticamente dal server vuoto all'avvio
+            if (CONFIG.apiUrl && (teams.length === 0 && matches.length === 0)) {
+                // Solo se non ci sono dati locali, prova a caricare dal server
                 loadDataFromServer();
-                startAutoSync();
-            } else {
-                showSetupBanner();
             }
+            
+            // Non avviare auto-sync automatico
+            // startAutoSync(); // Commentato
         }
 
         function updateUI() {
