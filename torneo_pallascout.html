@@ -536,8 +536,9 @@
         // Configurazione globale
         const CONFIG = {
             apiUrl: localStorage.getItem('pallascout_api_url') || '',
-            autoSync: false, // DISABILITATO per evitare problemi
-            syncInterval: 60000 // Solo se abilitato manualmente
+            autoSync: false, // SEMPRE DISABILITATO
+            syncInterval: 60000, // Non utilizzato
+            manualSyncOnly: true // FLAG PER SICUREZZA
         };
         
         // Dati globali
