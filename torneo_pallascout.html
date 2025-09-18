@@ -110,4 +110,21 @@
     function sincronizza() {
       fetch("https://script.google.com/macros/s/TUO_SCRIPT_ID/exec", {
         method: "POST",
-        body: JSON.stri
+        body: JSON.stringify(torneoData)
+      })
+      .then(res => res.json())
+      .then(data => {
+        alert("Dati sincronizzati con successo!");
+      })
+      .catch(err => {
+        console.error(err);
+        alert("Errore di sincronizzazione");
+      });
+    }
+
+    // All’avvio aggiorno l’interfaccia coi dati salvati
+    window.onload = aggiornaUI;
+  </script>
+
+</body>
+</html>
