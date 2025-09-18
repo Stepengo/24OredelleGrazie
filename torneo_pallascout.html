@@ -557,14 +557,11 @@
             updateUI();
             checkApiConfiguration();
             
-            // NON caricare automaticamente dal server vuoto all'avvio
-            if (CONFIG.apiUrl && (teams.length === 0 && matches.length === 0)) {
-                // Solo se non ci sono dati locali, prova a caricare dal server
-                loadDataFromServer();
+            // NON caricare automaticamente dal server all'avvio
+            // Non avviare mai auto-sync automatico
+            if (!CONFIG.apiUrl) {
+                showSetupBanner();
             }
-            
-            // Non avviare auto-sync automatico
-            // startAutoSync(); // Commentato
         }
 
         function updateUI() {
@@ -656,8 +653,7 @@
             updateSyncStatus('online');
             updateConnectionStatus();
             
-            // Avvia sincronizzazione automatica
-            startAutoSync();
+            // NON avviare sincronizzazione automatica
         }
 
         async function testConnection() {
@@ -913,11 +909,9 @@
                 displayStandings();
                 displayStats();
                 
-                showAlert('Squadra eliminata!', 'success');
+                showAlert('Squadra eliminata! Clicca "Salva Online" per sincronizzare.', 'success');
                 
-                if (CONFIG.apiUrl) {
-                    setTimeout(syncData, 1000);
-                }
+                // NESSUN auto-sync
             }
         }
 
@@ -1065,11 +1059,9 @@
                 displayStandings();
                 displayStats();
                 
-                showAlert('Partita eliminata!', 'success');
+                showAlert('Partita eliminata! Clicca "Salva Online" per sincronizzare.', 'success');
                 
-                if (CONFIG.apiUrl) {
-                    setTimeout(syncData, 1000);
-                }
+                // NESSUN auto-sync
             }
         }
 
@@ -1169,11 +1161,9 @@
             displayStats();
             closeResultModal();
             
-            showAlert('✅ Risultato salvato!', 'success');
+            showAlert('✅ Risultato salvato! Clicca "Salva Online" per sincronizzare.', 'success');
             
-            if (CONFIG.apiUrl) {
-                setTimeout(syncData, 1000);
-            }
+            // NESSUN auto-sync
         }
 
         // Classifica
@@ -1475,10 +1465,7 @@
                             
                             showAlert('📥 Dati importati con successo!', 'success');
                             
-                            // Sincronizza se possibile
-                            if (CONFIG.apiUrl) {
-                                setTimeout(syncData, 1000);
-                            }
+                            // NESSUN sync automatico dopo import
                         }
                     } else {
                         showAlert('❌ File non valido! Assicurati di importare un file esportato dall\'applicazione.', 'error');
@@ -1547,10 +1534,7 @@
                     
                     showAlert('✅ Tutti i dati sono stati cancellati. Puoi iniziare un nuovo torneo!', 'success');
                     
-                    // Sincronizza per pulire anche il server
-                    if (CONFIG.apiUrl) {
-                        setTimeout(syncData, 1000);
-                    }
+                    // NESSUN sync automatico dopo reset
                 }
             }
         }
