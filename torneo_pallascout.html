@@ -414,7 +414,7 @@
                         <input type="text" id="teamName" placeholder="Inserisci il nome della squadra">
                     </div>
                     <button class="btn" onclick="addTeam()">Aggiungi Squadra</button>
-                    <button class="btn btn-success" onclick="syncData()" style="margin-left: 15px;">💾 Salva Online</button>
+                    <button class="btn btn-success" onclick="syncData('manual')" style="margin-left: 15px;">💾 Salva Online</button>
                     <button class="btn" onclick="loadFromServer()" style="margin-left: 5px;">📥 Carica dal Server</button>
                 </div>
                 
@@ -524,7 +524,7 @@
     </div>
     
     <div class="controls">
-        <button class="btn btn-success" onclick="syncData()" title="Salva dati online">💾 Salva Online</button>
+        <button class="btn btn-success" onclick="syncData('manual')" title="Salva dati online">💾 Salva Online</button>
         <button class="btn" onclick="loadFromServer()" title="Carica dati dal server">📥 Carica Server</button>
         <button class="btn" onclick="exportData()" title="Esporta dati locali">📦 Esporta</button>
         <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display: none;">
