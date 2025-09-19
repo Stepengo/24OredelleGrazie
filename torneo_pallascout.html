@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gestionale Torneo Pallascout - Online</title>
+    <title>Gestionale Torneo Pallascout - NO AUTO-SYNC</title>
     <style>
         * {
             margin: 0;
@@ -392,7 +392,7 @@
         <div class="header">
             <div id="syncStatus" class="sync-status offline">🔴 Offline</div>
             <h1>🏆 Gestionale Torneo Pallascout</h1>
-            <p>Sistema completo per la gestione del torneo - <strong>Versione Online</strong></p>
+            <p>Sistema completo per la gestione del torneo - <strong>Versione NO AUTO-SYNC</strong></p>
         </div>
         
         <div class="nav">
@@ -414,7 +414,7 @@
                         <input type="text" id="teamName" placeholder="Inserisci il nome della squadra">
                     </div>
                     <button class="btn" onclick="addTeam()">Aggiungi Squadra</button>
-                    <button class="btn btn-success" onclick="syncData('manual')" style="margin-left: 15px;">💾 Salva Online</button>
+                    <button class="btn btn-success" onclick="manualSync()" style="margin-left: 15px;">💾 Salva Online</button>
                     <button class="btn" onclick="loadFromServer()" style="margin-left: 5px;">📥 Carica dal Server</button>
                 </div>
                 
@@ -524,7 +524,7 @@
     </div>
     
     <div class="controls">
-        <button class="btn btn-success" onclick="syncData('manual')" title="Salva dati online">💾 Salva Online</button>
+        <button class="btn btn-success" onclick="manualSync()" title="Salva dati online">💾 Salva Online</button>
         <button class="btn" onclick="loadFromServer()" title="Carica dati dal server">📥 Carica Server</button>
         <button class="btn" onclick="exportData()" title="Esporta dati locali">📦 Esporta</button>
         <input type="file" id="importFile" accept=".json" onchange="importData(event)" style="display: none;">
@@ -533,12 +533,13 @@
     </div>
 
     <script>
-        // Configurazione globale
+        // VERSIONE NO AUTO-SYNC - TUTTE LE FUNZIONI PULITE
+        console.log('🚫 VERSIONE NO AUTO-SYNC CARICATA');
+        
+        // Configurazione - AUTO-SYNC COMPLETAMENTE DISABILITATO
         const CONFIG = {
             apiUrl: localStorage.getItem('pallascout_api_url') || '',
-            autoSync: false, // SEMPRE DISABILITATO
-            syncInterval: 60000, // Non utilizzato
-            manualSyncOnly: true // FLAG PER SICUREZZA
+            manualSyncOnly: true // SEMPRE MANUALE
         };
         
         // Dati globali
@@ -546,24 +547,20 @@
         let matches = JSON.parse(localStorage.getItem('pallascout_matches') || '[]');
         let currentTeamId = null;
         let currentMatchId = null;
-        let syncTimer = null;
         let lastSyncTime = localStorage.getItem('pallascout_last_sync') || null;
 
-        // Inizializzazione
+        // Inizializzazione - NESSUN AUTO-SYNC
         document.addEventListener('DOMContentLoaded', function() {
-            initializeApp();
-        });
-
-        function initializeApp() {
+            console.log('🏁 Inizializzazione app...');
             updateUI();
             checkApiConfiguration();
             
-            // NON caricare automaticamente dal server all'avvio
-            // Non avviare mai auto-sync automatico
             if (!CONFIG.apiUrl) {
                 showSetupBanner();
             }
-        }
+            
+            console.log('✅ App inizializzata - NESSUN auto-sync');
+        });
 
         function updateUI() {
             updateTeamSelects();
@@ -593,7 +590,6 @@
             }
         }
 
-        // Gestione connessione e sincronizzazione
         function updateSyncStatus(status) {
             const syncStatus = document.getElementById('syncStatus');
             const statusText = document.getElementById('statusText');
@@ -653,167 +649,9 @@
             hideSetupBanner();
             updateSyncStatus('online');
             updateConnectionStatus();
-            
-            // NON avviare sincronizzazione automatica
         }
 
-        async function testConnection() {
-            if (!CONFIG.apiUrl) {
-                showAlert('Configura prima l\'URL di Apps Script!', 'error');
-                return;
-            }
-            
-            updateSyncStatus('syncing');
-            
-            try {
-                // Usa JSONP per evitare CORS
-                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'test' });
-                
-                if (response.success) {
-                    showAlert('✅ Connessione riuscita!', 'success');
-                    updateSyncStatus('online');
-                } else {
-                    showAlert('❌ Errore: ' + (response.message || 'Connessione fallita'), 'error');
-                    updateSyncStatus('error');
-                }
-            } catch (error) {
-                showAlert('❌ Errore di connessione: ' + error.message, 'error');
-                updateSyncStatus('error');
-                console.error('Test connection error:', error);
-            }
-        }
-
-        // Funzione per fare richieste JSONP (bypassa CORS)
-        function makeJSONPRequest(url, data = {}) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                
-                // Crea script tag per JSONP
-                const script = document.createElement('script');
-                const params = new URLSearchParams({
-                    callback: callbackName,
-                    action: data.action || 'loadData'
-                });
-                
-                // Se ci sono dati da inviare, codificali in base64
-                if (data.teams || data.matches) {
-                    const jsonString = JSON.stringify(data);
-                    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
-                    params.append('data', encoded);
-                }
-                
-                script.src = url + '?' + params.toString();
-                
-                // Timeout
-                const timeout = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('Timeout'));
-                }, 10000);
-                
-                // Callback globale
-                window[callbackName] = function(response) {
-                    clearTimeout(timeout);
-                    cleanup();
-                    resolve(response);
-                };
-                
-                // Cleanup function
-                function cleanup() {
-                    if (script.parentNode) {
-                        script.parentNode.removeChild(script);
-                    }
-                    delete window[callbackName];
-                }
-                
-                // Gestione errori
-                script.onerror = function() {
-                    clearTimeout(timeout);
-                    cleanup();
-                    reject(new Error('Script loading failed'));
-                };
-                
-                // Aggiungi script al DOM
-                document.head.appendChild(script);
-            });
-        }
-
-        async function syncData() {
-            if (!CONFIG.apiUrl) {
-                showAlert('Configura prima l\'URL di Apps Script!', 'warning');
-                return;
-            }
-            
-            updateSyncStatus('syncing');
-            
-            try {
-                // Prima carica i dati dal server
-                await loadDataFromServer();
-                
-                // Poi salva i dati locali sul server usando JSONP
-                const response = await makeJSONPRequest(CONFIG.apiUrl, {
-                    action: 'saveAll',
-                    teams: teams,
-                    matches: matches
-                });
-                
-                if (response.success) {
-                    lastSyncTime = new Date().toISOString();
-                    localStorage.setItem('pallascout_last_sync', lastSyncTime);
-                    
-                    showAlert('✅ Sincronizzazione completata!', 'success');
-                    updateSyncStatus('online');
-                    updateConnectionStatus();
-                } else {
-                    throw new Error(response.message || 'Errore di sincronizzazione');
-                }
-            } catch (error) {
-                showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
-                updateSyncStatus('error');
-                console.error('Sync error:', error);
-            }
-        }
-
-        async function loadDataFromServer() {
-            if (!CONFIG.apiUrl) return;
-            
-            try {
-                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
-                
-                if (response.success) {
-                    if (response.teams) teams = response.teams;
-                    if (response.matches) matches = response.matches;
-                    
-                    saveDataLocally();
-                    updateUI();
-                    
-                    lastSyncTime = new Date().toISOString();
-                    localStorage.setItem('pallascout_last_sync', lastSyncTime);
-                    updateConnectionStatus();
-                }
-            } catch (error) {
-                console.error('Load data error:', error);
-                updateSyncStatus('error');
-            }
-        }
-
-        function startAutoSync() {
-            if (syncTimer) clearInterval(syncTimer);
-            
-            if (CONFIG.autoSync && CONFIG.apiUrl) {
-                syncTimer = setInterval(() => {
-                    loadDataFromServer();
-                }, CONFIG.syncInterval);
-            }
-        }
-
-        function stopAutoSync() {
-            if (syncTimer) {
-                clearInterval(syncTimer);
-                syncTimer = null;
-            }
-        }
-
-        // Salvataggio dati locale (backup)
+        // Salvataggio dati locale
         function saveDataLocally() {
             localStorage.setItem('pallascout_teams', JSON.stringify(teams));
             localStorage.setItem('pallascout_matches', JSON.stringify(matches));
@@ -847,8 +685,10 @@
             event.target.classList.add('active');
         }
 
-        // Gestione squadre
-        async function addTeam() {
+        // GESTIONE SQUADRE - NO AUTO-SYNC
+        function addTeam() {
+            console.log('🏆 INIZIO addTeam - NESSUN AUTO-SYNC');
+            
             const teamName = document.getElementById('teamName').value.trim();
             if (!teamName) {
                 showAlert('Inserisci il nome della squadra', 'error');
@@ -867,12 +707,10 @@
             updateTeamSelects();
             displayTeams();
             
-            showAlert(`Squadra "${teamName}" aggiunta!`, 'success');
+            console.log('✅ Squadra aggiunta SOLO LOCALMENTE:', teamName);
+            showAlert(`Squadra "${teamName}" aggiunta localmente! Clicca "💾 Salva Online" per sincronizzare.`, 'success');
             
-            // Sincronizza automaticamente se configurato
-            if (CONFIG.apiUrl) {
-                setTimeout(syncData, 1000);
-            }
+            console.log('🔒 FINE addTeam - NESSUNA chiamata di sync automatico');
         }
 
         function displayTeams() {
@@ -900,7 +738,7 @@
             `).join('');
         }
 
-        async function deleteTeam(teamId) {
+        function deleteTeam(teamId) {
             if (confirm('Sei sicuro di voler eliminare questa squadra?')) {
                 teams = teams.filter(team => team.id !== teamId);
                 saveDataLocally();
@@ -910,9 +748,7 @@
                 displayStandings();
                 displayStats();
                 
-                showAlert('Squadra eliminata! Clicca "Salva Online" per sincronizzare.', 'success');
-                
-                // NESSUN auto-sync
+                showAlert('Squadra eliminata localmente! Clicca "💾 Salva Online" per sincronizzare.', 'success');
             }
         }
 
@@ -925,7 +761,7 @@
             });
         }
 
-        // Gestione giocatori
+        // GESTIONE GIOCATORI - NO AUTO-SYNC
         function openPlayerModal(teamId) {
             currentTeamId = teamId;
             document.getElementById('playerModal').style.display = 'block';
@@ -937,7 +773,7 @@
             document.getElementById('playerPosition').value = '';
         }
 
-        async function addPlayer() {
+        function addPlayer() {
             const playerName = document.getElementById('playerName').value.trim();
             const playerPosition = document.getElementById('playerPosition').value.trim();
             
@@ -960,16 +796,13 @@
                 displayTeams();
                 closePlayerModal();
                 
-                showAlert(`Giocatore "${playerName}" aggiunto!`, 'success');
-                
-                if (CONFIG.apiUrl) {
-                    setTimeout(syncData, 1000);
-                }
+                console.log('👤 Giocatore aggiunto SOLO LOCALMENTE:', playerName);
+                showAlert(`Giocatore "${playerName}" aggiunto localmente!`, 'success');
             }
         }
 
-        // Gestione partite
-        async function addMatch() {
+        // GESTIONE PARTITE - NO AUTO-SYNC
+        function addMatch() {
             const team1Id = parseInt(document.getElementById('team1').value);
             const team2Id = parseInt(document.getElementById('team2').value);
             const matchDate = document.getElementById('matchDate').value;
@@ -1005,11 +838,8 @@
             document.getElementById('matchDate').value = '';
             displayMatches();
             
-            showAlert('Partita programmata!', 'success');
-            
-            if (CONFIG.apiUrl) {
-                setTimeout(syncData, 1000);
-            }
+            console.log('⚽ Partita aggiunta SOLO LOCALMENTE');
+            showAlert('Partita programmata localmente!', 'success');
         }
 
         function displayMatches() {
@@ -1052,7 +882,7 @@
             }).join('');
         }
 
-        async function deleteMatch(matchId) {
+        function deleteMatch(matchId) {
             if (confirm('Sei sicuro di voler eliminare questa partita?')) {
                 matches = matches.filter(match => match.id !== matchId);
                 saveDataLocally();
@@ -1060,13 +890,11 @@
                 displayStandings();
                 displayStats();
                 
-                showAlert('Partita eliminata! Clicca "Salva Online" per sincronizzare.', 'success');
-                
-                // NESSUN auto-sync
+                showAlert('Partita eliminata localmente!', 'success');
             }
         }
 
-        // Gestione risultati
+        // GESTIONE RISULTATI - NO AUTO-SYNC
         function openResultModal(matchId) {
             currentMatchId = matchId;
             const match = matches.find(m => m.id === matchId);
@@ -1131,7 +959,7 @@
             document.getElementById('resultModal').style.display = 'none';
         }
 
-        async function saveMatchResult() {
+        function saveMatchResult() {
             const match = matches.find(m => m.id === currentMatchId);
             const team1 = teams.find(t => t.id === match.team1Id);
             const team2 = teams.find(t => t.id === match.team2Id);
@@ -1162,12 +990,11 @@
             displayStats();
             closeResultModal();
             
-            showAlert('✅ Risultato salvato! Clicca "Salva Online" per sincronizzare.', 'success');
-            
-            // NESSUN auto-sync
+            console.log('📊 Risultato salvato SOLO LOCALMENTE');
+            showAlert('✅ Risultato salvato localmente!', 'success');
         }
 
-        // Classifica
+        // CLASSIFICA
         function displayStandings() {
             const standings = calculateStandings();
             
@@ -1266,7 +1093,7 @@
             });
         }
 
-        // Statistiche
+        // STATISTICHE
         function displayStats() {
             const completedMatches = matches.filter(m => m.status === 'completed');
             const totalMatches = completedMatches.length;
@@ -1405,20 +1232,157 @@
             });
         }
 
-        // Event listeners per chiudere i modal
-        window.onclick = function(event) {
-            const playerModal = document.getElementById('playerModal');
-            const resultModal = document.getElementById('resultModal');
-            
-            if (event.target === playerModal) {
-                closePlayerModal();
+        // SYNC FUNCTIONS - SOLO MANUALI
+        function makeJSONPRequest(url, data = {}) {
+            return new Promise((resolve, reject) => {
+                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+                
+                const script = document.createElement('script');
+                const params = new URLSearchParams({
+                    callback: callbackName,
+                    action: data.action || 'loadData'
+                });
+                
+                if (data.teams || data.matches) {
+                    const jsonString = JSON.stringify(data);
+                    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+                    params.append('data', encoded);
+                }
+                
+                script.src = url + '?' + params.toString();
+                
+                const timeout = setTimeout(() => {
+                    cleanup();
+                    reject(new Error('Timeout'));
+                }, 10000);
+                
+                window[callbackName] = function(response) {
+                    clearTimeout(timeout);
+                    cleanup();
+                    resolve(response);
+                };
+                
+                function cleanup() {
+                    if (script.parentNode) {
+                        script.parentNode.removeChild(script);
+                    }
+                    delete window[callbackName];
+                }
+                
+                script.onerror = function() {
+                    clearTimeout(timeout);
+                    cleanup();
+                    reject(new Error('Script loading failed'));
+                };
+                
+                document.head.appendChild(script);
+            });
+        }
+
+        async function testConnection() {
+            if (!CONFIG.apiUrl) {
+                showAlert('Configura prima l\'URL di Apps Script!', 'error');
+                return;
             }
-            if (event.target === resultModal) {
-                closeResultModal();
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'test' });
+                
+                if (response.success) {
+                    showAlert('✅ Connessione riuscita!', 'success');
+                    updateSyncStatus('online');
+                } else {
+                    showAlert('❌ Errore: ' + (response.message || 'Connessione fallita'), 'error');
+                    updateSyncStatus('error');
+                }
+            } catch (error) {
+                showAlert('❌ Errore di connessione: ' + error.message, 'error');
+                updateSyncStatus('error');
+                console.error('Test connection error:', error);
             }
         }
 
-        // Funzioni di utilità per l'export/import dei dati
+        // SYNC MANUALE - SOLO SALVATAGGIO
+        async function manualSync() {
+            console.log('💾 SYNC MANUALE AVVIATO');
+            
+            if (!CONFIG.apiUrl) {
+                showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+                return;
+            }
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                console.log('Invio dati al server:', { teams: teams.length, matches: matches.length });
+                
+                const response = await makeJSONPRequest(CONFIG.apiUrl, {
+                    action: 'saveAll',
+                    teams: teams,
+                    matches: matches
+                });
+                
+                console.log('Risposta server:', response);
+                
+                if (response.success) {
+                    lastSyncTime = new Date().toISOString();
+                    localStorage.setItem('pallascout_last_sync', lastSyncTime);
+                    
+                    showAlert('✅ Dati salvati online!', 'success');
+                    updateSyncStatus('online');
+                    updateConnectionStatus();
+                } else {
+                    throw new Error(response.message || 'Errore di sincronizzazione');
+                }
+            } catch (error) {
+                showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
+                updateSyncStatus('error');
+                console.error('Sync error:', error);
+            }
+        }
+
+        // CARICA DAL SERVER
+        async function loadFromServer() {
+            if (!CONFIG.apiUrl) {
+                showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+                return;
+            }
+            
+            if (!confirm('⚠️ Caricare i dati dal server? I dati locali verranno sovrascritti.')) {
+                return;
+            }
+            
+            updateSyncStatus('syncing');
+            
+            try {
+                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
+                
+                if (response.success) {
+                    teams = response.teams || [];
+                    matches = response.matches || [];
+                    
+                    saveDataLocally();
+                    updateUI();
+                    
+                    lastSyncTime = new Date().toISOString();
+                    localStorage.setItem('pallascout_last_sync', lastSyncTime);
+                    updateConnectionStatus();
+                    
+                    showAlert(`✅ Caricati ${teams.length} squadre e ${matches.length} partite dal server!`, 'success');
+                    updateSyncStatus('online');
+                } else {
+                    throw new Error(response.message || 'Errore caricamento');
+                }
+            } catch (error) {
+                showAlert('❌ Errore caricamento: ' + error.message, 'error');
+                updateSyncStatus('error');
+                console.error('Load error:', error);
+            }
+        }
+
+        // EXPORT/IMPORT
         function exportData() {
             const data = {
                 teams: teams,
@@ -1454,7 +1418,6 @@
                             teams = data.teams;
                             matches = data.matches;
                             
-                            // Importa anche l'URL API se presente
                             if (data.apiUrl && !CONFIG.apiUrl) {
                                 CONFIG.apiUrl = data.apiUrl;
                                 localStorage.setItem('pallascout_api_url', data.apiUrl);
@@ -1465,67 +1428,25 @@
                             updateUI();
                             
                             showAlert('📥 Dati importati con successo!', 'success');
-                            
-                            // NESSUN sync automatico dopo import
                         }
                     } else {
-                        showAlert('❌ File non valido! Assicurati di importare un file esportato dall\'applicazione.', 'error');
+                        showAlert('❌ File non valido!', 'error');
                     }
                 } catch (error) {
-                    showAlert('❌ Errore nel caricamento del file! Verifica che sia un file JSON valido.', 'error');
+                    showAlert('❌ Errore nel caricamento del file!', 'error');
                 }
             };
             reader.readAsText(file);
-            event.target.value = ''; // Reset input
+            event.target.value = '';
         }
 
-        // Backup automatico locale
-        function autoBackup() {
-            const backupData = {
-                teams: teams,
-                matches: matches,
-                timestamp: Date.now(),
-                version: '2.0'
-            };
-            
-            localStorage.setItem('pallascout_auto_backup', JSON.stringify(backupData));
-        }
-
-        // Salva backup locale ogni 2 minuti
-        setInterval(autoBackup, 120000);
-
-        // Ripristina da backup automatico se necessario
-        function restoreFromAutoBackup() {
-            const backup = localStorage.getItem('pallascout_auto_backup');
-            if (backup && teams.length === 0 && matches.length === 0) {
-                try {
-                    const backupData = JSON.parse(backup);
-                    const backupDate = new Date(backupData.timestamp);
-                    
-                    if (confirm(`🔄 Trovato backup automatico del ${backupDate.toLocaleString('it-IT')}. Vuoi ripristinarlo?`)) {
-                        teams = backupData.teams || [];
-                        matches = backupData.matches || [];
-                        saveDataLocally();
-                        updateUI();
-                        showAlert('✅ Backup ripristinato!', 'success');
-                    }
-                } catch (error) {
-                    console.log('Errore nel ripristino del backup automatico');
-                }
-            }
-        }
-
-        // Controlla backup al caricamento
-        setTimeout(restoreFromAutoBackup, 2000);
-
-        // Funzione per resettare tutti i dati
-        async function resetAllData() {
-            if (confirm('⚠️ ATTENZIONE: Questa operazione cancellerà tutti i dati del torneo (squadre, giocatori, partite, risultati). Sei sicuro?')) {
-                if (confirm('❌ Conferma di voler cancellare DEFINITIVAMENTE tutti i dati? Questa operazione non può essere annullata!')) {
+        // RESET
+        function resetAllData() {
+            if (confirm('⚠️ ATTENZIONE: Cancellare tutti i dati?')) {
+                if (confirm('❌ Conferma cancellazione DEFINITIVA?')) {
                     teams = [];
                     matches = [];
                     
-                    // Pulisci storage locale
                     localStorage.removeItem('pallascout_teams');
                     localStorage.removeItem('pallascout_matches');
                     localStorage.removeItem('pallascout_auto_backup');
@@ -1533,69 +1454,34 @@
                     
                     updateUI();
                     
-                    showAlert('✅ Tutti i dati sono stati cancellati. Puoi iniziare un nuovo torneo!', 'success');
-                    
-                    // NESSUN sync automatico dopo reset
+                    showAlert('✅ Dati cancellati!', 'success');
                 }
             }
         }
 
-        // Event listeners per Enter e validazione
+        // EVENT LISTENERS
+        window.onclick = function(event) {
+            const playerModal = document.getElementById('playerModal');
+            const resultModal = document.getElementById('resultModal');
+            
+            if (event.target === playerModal) {
+                closePlayerModal();
+            }
+            if (event.target === resultModal) {
+                closeResultModal();
+            }
+        }
+
         document.getElementById('teamName').addEventListener('keypress', function(e) {
             if (e.key === 'Enter') {
                 addTeam();
             }
         });
 
-        // Gestione offline/online
-        window.addEventListener('online', function() {
-            if (CONFIG.apiUrl) {
-                updateSyncStatus('online');
-                loadDataFromServer();
-                startAutoSync();
-            }
-        });
-
-        window.addEventListener('offline', function() {
-            updateSyncStatus('offline');
-            stopAutoSync();
-        });
-
-        // Validazione in tempo reale
-        document.getElementById('teamName').addEventListener('input', function(e) {
-            const btn = document.querySelector('button[onclick="addTeam()"]');
-            if (e.target.value.trim()) {
-                btn.style.opacity = '1';
-                btn.style.cursor = 'pointer';
-                btn.disabled = false;
-            } else {
-                btn.style.opacity = '0.5';
-                btn.style.cursor = 'not-allowed';
-                btn.disabled = true;
-            }
-        });
-
-        // Gestione visibilità pagina (pausa sync quando nascosta)
-        document.addEventListener('visibilitychange', function() {
-            if (document.visibilityState === 'visible' && CONFIG.apiUrl) {
-                loadDataFromServer();
-                startAutoSync();
-            } else {
-                stopAutoSync();
-            }
-        });
-
-        // Cleanup quando la pagina viene chiusa
-        window.addEventListener('beforeunload', function() {
-            stopAutoSync();
-            autoBackup();
-        });
-
-        // Log inizializzazione
-        console.log('🏆 Gestionale Torneo Pallascout Online caricato con successo!');
+        console.log('🏁 App NO AUTO-SYNC completamente caricata!');
         console.log('📊 Teams:', teams.length);
         console.log('⚽ Matches:', matches.length);
-        console.log('🌐 API URL:', CONFIG.apiUrl || 'Non configurato');
+        console.log('🔒 Auto-sync: COMPLETAMENTE DISABILITATO');
     </script>
 </body>
 </html>
