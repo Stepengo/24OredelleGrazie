@@ -382,6 +382,199 @@
             }
         }
     </style>
+    <!-- Aggiungi queste righe nell'<head> del tuo torneo_pallascout.html esistente -->
+
+<!-- PWA Meta Tags -->
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#1e3c72">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Torneo Pallascout">
+<meta name="mobile-web-app-capable" content="yes">
+
+<!-- PWA Manifest -->
+<link rel="manifest" href="./manifest.json">
+
+<!-- Icone per dispositivi Apple -->
+<link rel="apple-touch-icon" href="./icons/icon-192x192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="./icons/icon-192x192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="./icons/icon-512x512.png">
+
+<!-- Icona per Windows -->
+<meta name="msapplication-TileColor" content="#1e3c72">
+<meta name="msapplication-TileImage" content="./icons/icon-192x192.png">
+
+<!-- Aggiungi questo script PRIMA della chiusura del </body> -->
+<script>
+// 🚀 PWA SERVICE WORKER REGISTRATION
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./service-worker.js')
+      .then(registration => {
+        console.log('✅ Service Worker registrato:', registration.scope);
+        
+        // Controlla aggiornamenti
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+              showUpdateBanner();
+            }
+          });
+        });
+      })
+      .catch(error => {
+        console.log('❌ Service Worker registrazione fallita:', error);
+      });
+  });
+}
+
+// 📱 PWA INSTALLATION BANNER
+let deferredPrompt;
+let installBannerShown = false;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  console.log('📱 PWA: Install prompt available');
+  e.preventDefault();
+  deferredPrompt = e;
+  
+  // Mostra il banner dopo 3 secondi se non è stato già mostrato
+  if (!installBannerShown && !localStorage.getItem('pwa_install_dismissed')) {
+    setTimeout(showInstallBanner, 3000);
+  }
+});
+
+window.addEventListener('appinstalled', () => {
+  console.log('🎉 PWA: App installed successfully');
+  hideInstallBanner();
+  showAlert('🎉 App installata con successo!', 'success');
+  localStorage.setItem('pwa_installed', 'true');
+});
+
+function showInstallBanner() {
+  if (installBannerShown || localStorage.getItem('pwa_installed')) return;
+  
+  installBannerShown = true;
+  const banner = document.createElement('div');
+  banner.id = 'pwaInstallBanner';
+  banner.innerHTML = `
+    <div style="
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%);
+      color: white;
+      padding: 15px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+      z-index: 10001;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      animation: slideUp 0.3s ease-out;
+    ">
+      <div style='flex: 1;'>
+        <div style='font-size: 16px; font-weight: bold; margin-bottom: 4px;'>
+          📱 Installa l'App
+        </div>
+        <div style='font-size: 14px; opacity: 0.9;'>
+          Aggiungi Torneo Pallascout alla schermata principale per un accesso rapido
+        </div>
+      </div>
+      <div style='display: flex; gap: 8px; margin-left: 15px;'>
+        <button onclick='installPWA()' style='
+          background: white;
+          color: #1e3c72;
+          border: none;
+          padding: 10px 16px;
+          border-radius: 6px;
+          font-weight: bold;
+          font-size: 14px;
+          cursor: pointer;
+        '>Installa</button>
+        <button onclick='dismissInstallBanner()' style='
+          background: transparent;
+          color: white;
+          border: 1px solid rgba(255,255,255,0.5);
+          padding: 10px 12px;
+          border-radius: 6px;
+          font-size: 14px;
+          cursor: pointer;
+        '>✕</button>
+      </div>
+    </div>
+  `;
+  
+  // Aggiungi stili per l'animazione
+  const style = document.createElement('style');
+  style.textContent = `
+    @keyframes slideUp {
+      from { transform: translateY(100%); opacity: 0; }
+      to { transform: translateY(0); opacity: 1; }
+    }
+  `;
+  document.head.appendChild(style);
+  
+  document.body.appendChild(banner);
+}
+
+function installPWA() {
+  if (deferredPrompt) {
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then((choiceResult) => {
+      if (choiceResult.outcome === 'accepted') {
+        console.log('✅ PWA: User accepted installation');
+        localStorage.setItem('pwa_installed', 'true');
+      } else {
+        console.log('❌ PWA: User dismissed installation');
+      }
+      deferredPrompt = null;
+    });
+  }
+  hideInstallBanner();
+}
+
+function dismissInstallBanner() {
+  localStorage.setItem('pwa_install_dismissed', 'true');
+  hideInstallBanner();
+}
+
+function hideInstallBanner() {
+  const banner = document.getElementById('pwaInstallBanner');
+  if (banner) {
+    banner.style.animation = 'slideDown 0.3s ease-out forwards';
+    setTimeout(() => banner.remove(), 300);
+  }
+  installBannerShown = false;
+}
+
+// Stile per slideDown
+const slideDownStyle = document.createElement('style');
+slideDownStyle.textContent = `
+  @keyframes slideDown {
+    from { transform: translateY(0); opacity: 1; }
+    to { transform: translateY(100%); opacity: 0; }
+  }
+`;
+document.head.appendChild(slideDownStyle);
+
+function showUpdateBanner() {
+  showAlert('🔄 Nuova versione disponibile! Ricarica la pagina per aggiornarla.', 'warning');
+}
+
+// 🔍 PWA DEBUG INFO
+console.log('🔍 PWA Debug Info:');
+console.log('- Service Worker supportato:', 'serviceWorker' in navigator);
+console.log('- Installazione PWA supportata:', 'BeforeInstallPromptEvent' in window);
+console.log('- Modalità standalone:', window.matchMedia('(display-mode: standalone)').matches);
+
+// Rileva se l'app è già installata
+if (window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true) {
+  console.log('🎉 App eseguita in modalità standalone (installata)');
+  document.body.classList.add('pwa-installed');
+}
+</script>
 </head>
 <body>
     <div id="setupBanner" class="setup-banner" style="display: none;">
