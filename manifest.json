@@ -1,0 +1,36 @@
+{
+  "name": "Torneo Pallascout",
+  "short_name": "Pallascout",
+  "description": "Sistema completo per la gestione del torneo di pallascout con gol e scalpi",
+  "start_url": "./torneo_pallascout.html",
+  "display": "standalone",
+  "background_color": "#667eea",
+  "theme_color": "#1e3c72",
+  "orientation": "portrait-primary",
+  "scope": "./",
+  "lang": "it",
+  "categories": ["sports", "games", "utilities"],
+  "icons": [
+    {
+      "src": "./icons/icon-192x192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable any"
+    },
+    {
+      "src": "./icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable any"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "./icons/screenshot-narrow.png",
+      "sizes": "540x720",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "prefer_related_applications": false
+}
