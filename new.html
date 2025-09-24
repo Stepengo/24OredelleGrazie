@@ -1407,78 +1407,228 @@ function addTeam() {
             });
         }
 
-        // SYNC FUNCTIONS - SOLO MANUALI
-        function makeJSONPRequest(url, data = {}) {
-            return new Promise((resolve, reject) => {
-                const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
-                
-                const script = document.createElement('script');
-                const params = new URLSearchParams({
-                    callback: callbackName,
-                    action: data.action || 'loadData'
-                });
-                
-                if (data.teams || data.matches) {
-                    const jsonString = JSON.stringify(data);
-                    const encoded = btoa(unescape(encodeURIComponent(jsonString)));
-                    params.append('data', encoded);
-                }
-                
-                script.src = url + '?' + params.toString();
-                
-                const timeout = setTimeout(() => {
-                    cleanup();
-                    reject(new Error('Timeout'));
-                }, 10000);
-                
-                window[callbackName] = function(response) {
-                    clearTimeout(timeout);
-                    cleanup();
-                    resolve(response);
-                };
-                
-                function cleanup() {
-                    if (script.parentNode) {
-                        script.parentNode.removeChild(script);
-                    }
-                    delete window[callbackName];
-                }
-                
-                script.onerror = function() {
-                    clearTimeout(timeout);
-                    cleanup();
-                    reject(new Error('Script loading failed'));
-                };
-                
-                document.head.appendChild(script);
-            });
-        }
+// Fix per la funzione di sincronizzazione - sostituisci nel tuo HTML
 
-        async function testConnection() {
-            if (!CONFIG.apiUrl) {
-                showAlert('Configura prima l\'URL di Apps Script!', 'error');
+// Funzione JSONP corretta
+function makeJSONPRequest(url, data = {}) {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+        
+        const script = document.createElement('script');
+        const params = new URLSearchParams({
+            callback: callbackName,
+            action: data.action || 'loadData'
+        });
+        
+        // CODIFICA CORRETTA DEI DATI
+        if (data.teams || data.matches) {
+            try {
+                const jsonData = {
+                    teams: data.teams || [],
+                    matches: data.matches || []
+                };
+                
+                // Converti in JSON string
+                const jsonString = JSON.stringify(jsonData);
+                console.log('JSON da inviare:', jsonString.length, 'caratteri');
+                
+                // Codifica in base64
+                const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+                params.append('data', encoded);
+                
+                console.log('Dati codificati per invio:', encoded.length, 'caratteri');
+                
+            } catch (encodeError) {
+                console.error('Errore codifica dati:', encodeError);
+                reject(new Error('Errore nella codifica dei dati'));
                 return;
             }
-            
-            updateSyncStatus('syncing');
-            
-            try {
-                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'test' });
-                
-                if (response.success) {
-                    showAlert('✅ Connessione riuscita!', 'success');
-                    updateSyncStatus('online');
-                } else {
-                    showAlert('❌ Errore: ' + (response.message || 'Connessione fallita'), 'error');
-                    updateSyncStatus('error');
-                }
-            } catch (error) {
-                showAlert('❌ Errore di connessione: ' + error.message, 'error');
-                updateSyncStatus('error');
-                console.error('Test connection error:', error);
-            }
         }
+        
+        script.src = url + '?' + params.toString();
+        
+        const timeout = setTimeout(() => {
+            cleanup();
+            reject(new Error('Timeout - nessuna risposta dal server'));
+        }, 15000); // Aumentato timeout a 15 secondi
+        
+        window[callbackName] = function(response) {
+            clearTimeout(timeout);
+            cleanup();
+            console.log('Risposta ricevuta:', response);
+            resolve(response);
+        };
+        
+        function cleanup() {
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
+            }
+            delete window[callbackName];
+        }
+        
+        script.onerror = function() {
+            clearTimeout(timeout);
+            cleanup();
+            reject(new Error('Errore caricamento script'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
 
+// Sync manuale corretta
+async function manualSync() {
+    console.log('💾 SYNC MANUALE AVVIATO');
+    
+    if (!CONFIG.apiUrl) {
+        showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+        return;
+    }
+    
+    updateSyncStatus('syncing');
+    
+    try {
+        // Prima carica i dati dal server per il merge
+        console.log('📥 Caricamento dati server per merge...');
+        
+        let serverData = { teams: [], matches: [] };
+        try {
+            const serverResponse = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
+            if (serverResponse.success) {
+                serverData = {
+                    teams: serverResponse.teams || [],
+                    matches: serverResponse.matches || []
+                };
+                console.log('Server data:', serverData.teams.length, 'squadre,', serverData.matches.length, 'partite');
+            }
+        } catch (loadError) {
+            console.log('Impossibile caricare dati server, procedo con solo dati locali');
+        }
+        
+        // Merge dati locali con server
+        const localData = { teams: teams, matches: matches };
+        const mergedData = mergeDataClient(localData, serverData);
+        
+        console.log('Dati merged:', mergedData.teams.length, 'squadre,', mergedData.matches.length, 'partite');
+        
+        // Salva i dati merged
+        const response = await makeJSONPRequest(CONFIG.apiUrl, {
+            action: 'saveAll',
+            teams: mergedData.teams,
+            matches: mergedData.matches
+        });
+        
+        console.log('Risposta salvataggio:', response);
+        
+        if (response.success) {
+            // Aggiorna i dati locali con quelli merged
+            teams = mergedData.teams;
+            matches = mergedData.matches;
+            saveDataLocally();
+            updateUI();
+            
+            lastSyncTime = new Date().toISOString();
+            localStorage.setItem('pallascout_last_sync', lastSyncTime);
+            
+            showAlert('✅ Sincronizzazione completata!', 'success');
+            updateSyncStatus('online');
+            updateConnectionStatus();
+        } else {
+            throw new Error(response.message || 'Errore di sincronizzazione');
+        }
+    } catch (error) {
+        console.error('Errore sync:', error);
+        showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
+        updateSyncStatus('error');
+    }
+}
+
+// Merge lato client semplificato
+function mergeDataClient(localData, serverData) {
+    console.log('🔄 Merge lato client...');
+    
+    const mergedTeams = [...(serverData.teams || [])];
+    const mergedMatches = [...(serverData.matches || [])];
+    
+    // Merge squadre
+    localData.teams.forEach(localTeam => {
+        const existingIndex = mergedTeams.findIndex(t => t.id === localTeam.id);
+        
+        if (existingIndex === -1) {
+            // Nuova squadra locale
+            mergedTeams.push(localTeam);
+            console.log('➕ Nuova squadra locale:', localTeam.name);
+        } else {
+            // Squadra esistente - merge giocatori
+            const existing = mergedTeams[existingIndex];
+            const mergedPlayers = [...(existing.players || [])];
+            
+            localTeam.players.forEach(localPlayer => {
+                const playerIndex = mergedPlayers.findIndex(p => p.id === localPlayer.id);
+                if (playerIndex === -1) {
+                    mergedPlayers.push(localPlayer);
+                    console.log('👤 Nuovo giocatore:', localPlayer.name);
+                }
+            });
+            
+            mergedTeams[existingIndex] = {
+                ...existing,
+                players: mergedPlayers,
+                name: localTeam.name // Preferisci nome locale se diverso
+            };
+        }
+    });
+    
+    // Merge partite
+    localData.matches.forEach(localMatch => {
+        const existingIndex = mergedMatches.findIndex(m => m.id === localMatch.id);
+        
+        if (existingIndex === -1) {
+            // Nuova partita locale
+            mergedMatches.push(localMatch);
+            console.log('⚽ Nuova partita locale:', localMatch.id);
+        } else {
+            const existing = mergedMatches[existingIndex];
+            
+            // Se la partita locale è completata e quella server no, usa locale
+            if (localMatch.status === 'completed' && existing.status === 'scheduled') {
+                mergedMatches[existingIndex] = localMatch;
+                console.log('📊 Aggiornato risultato partita:', localMatch.id);
+            }
+            // Altrimenti mantieni quella server per sicurezza
+        }
+    });
+    
+    return {
+        teams: mergedTeams,
+        matches: mergedMatches
+    };
+}
+
+// Test connessione semplificato
+async function testConnection() {
+    if (!CONFIG.apiUrl) {
+        showAlert('Configura prima l\'URL di Apps Script!', 'error');
+        return;
+    }
+    
+    updateSyncStatus('syncing');
+    
+    try {
+        const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'test' });
+        
+        if (response.success) {
+            showAlert('✅ Connessione riuscita! ' + response.message, 'success');
+            updateSyncStatus('online');
+        } else {
+            throw new Error(response.message || 'Test fallito');
+        }
+    } catch (error) {
+        showAlert('❌ Errore connessione: ' + error.message, 'error');
+        updateSyncStatus('error');
+        console.error('Test error:', error);
+    }
+}
 // SISTEMA DI MERGE PER EVITARE SOVRASCRITTURE
 // Aggiungi questo al tuo codice JavaScript
 
