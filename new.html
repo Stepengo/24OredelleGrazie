@@ -1783,67 +1783,6 @@ async function testConnection() {
         console.error('Test error:', error);
     }
 }
-// SISTEMA DI MERGE PER EVITARE SOVRASCRITTURE
-// Aggiungi questo al tuo codice JavaScript
-
-// Modifica la funzione manualSync esistente
-async function manualSync() {
-    console.log('💾 SYNC MANUALE CON MERGE AVVIATO');
-    
-    if (!CONFIG.apiUrl) {
-        showAlert('Configura prima l\'URL di Apps Script!', 'warning');
-        return;
-    }
-    
-    updateSyncStatus('syncing');
-    
-    try {
-        // 1. Prima carica i dati correnti dal server
-        console.log('📥 Caricamento dati server per merge...');
-        const currentResponse = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
-        
-        if (currentResponse.success) {
-            // 2. Fai il merge dei dati
-            const mergedData = mergeData({
-                teams: teams,
-                matches: matches
-            }, {
-                teams: currentResponse.teams || [],
-                matches: currentResponse.matches || []
-            });
-            
-            // 3. Salva i dati merged
-            const response = await makeJSONPRequest(CONFIG.apiUrl, {
-                action: 'saveAll',
-                teams: mergedData.teams,
-                matches: mergedData.matches
-            });
-            
-            if (response.success) {
-                // 4. Aggiorna i dati locali con quelli merged
-                teams = mergedData.teams;
-                matches = mergedData.matches;
-                saveDataLocally();
-                updateUI();
-                
-                lastSyncTime = new Date().toISOString();
-                localStorage.setItem('pallascout_last_sync', lastSyncTime);
-                
-                showAlert('✅ Dati sincronizzati con merge!', 'success');
-                updateSyncStatus('online');
-                updateConnectionStatus();
-            } else {
-                throw new Error(response.message || 'Errore di sincronizzazione');
-            }
-        } else {
-            throw new Error('Impossibile caricare dati server');
-        }
-    } catch (error) {
-        showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
-        updateSyncStatus('error');
-        console.error('Sync error:', error);
-    }
-}
 
 // Funzione di merge intelligente
 function mergeData(localData, serverData) {
