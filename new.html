@@ -544,7 +544,12 @@
                     <button class="btn" onclick="saveApiUrl()">💾 Salva URL</button>
                     <button class="btn btn-success" onclick="testConnection()">🧪 Test Connessione</button>
                 </div>
-                
+ 
+<div class="card">
+    <h3>📊 Status Sistema</h3>
+    <button class="btn" onclick="showSheetStatus()">Visualizza Status Fogli</button>
+    <button class="btn btn-success" onclick="loadFromServer()">🔄 Sincronizza con Server</button>
+</div>               
                 <div class="card">
                     <h3>📊 Stato Connessione</h3>
                     <div id="connectionStatus">
@@ -591,6 +596,116 @@
     </div>
 
     <script>
+// Aggiungi queste NUOVE funzioni all'inizio del tuo script
+function encodeAndSend(data) {
+    const jsonString = JSON.stringify(data);
+    return btoa(unescape(encodeURIComponent(jsonString)));
+}
+
+async function saveTeamToServer(team, action = 'ADD') {
+    if (!CONFIG.apiUrl) {
+        console.log('No API URL configured, saving only locally');
+        return { success: true, local: true };
+    }
+    
+    try {
+        const data = {
+            team: team,
+            action: action,
+            timestamp: new Date().toISOString()
+        };
+        
+        const encodedData = encodeAndSend(data);
+        
+        const response = await makeJSONPRequest(CONFIG.apiUrl, {
+            action: 'saveTeam',
+            data: encodedData
+        });
+        
+        return response;
+    } catch (error) {
+        console.error('Error saving team to server:', error);
+        return { success: false, message: error.message };
+    }
+}
+
+async function saveMatchToServer(match, action = 'ADD') {
+    if (!CONFIG.apiUrl) {
+        console.log('No API URL configured, saving only locally');
+        return { success: true, local: true };
+    }
+    
+    try {
+        const data = {
+            match: match,
+            action: action,
+            timestamp: new Date().toISOString()
+        };
+        
+        const encodedData = encodeAndSend(data);
+        
+        const response = await makeJSONPRequest(CONFIG.apiUrl, {
+            action: 'saveMatch',
+            data: encodedData
+        });
+        
+        return response;
+    } catch (error) {
+        console.error('Error saving match to server:', error);
+        return { success: false, message: error.message };
+    }
+}
+
+async function saveMatchResultToServer(match) {
+    if (!CONFIG.apiUrl) {
+        console.log('No API URL configured, saving only locally');
+        return { success: true, local: true };
+    }
+    
+    try {
+        const data = {
+            match: match,
+            action: 'RESULT',
+            timestamp: new Date().toISOString()
+        };
+        
+        const encodedData = encodeAndSend(data);
+        
+        const response = await makeJSONPRequest(CONFIG.apiUrl, {
+            action: 'saveMatchResult',
+            data: encodedData
+        });
+        
+        return response;
+    } catch (error) {
+        console.error('Error saving result to server:', error);
+        return { success: false, message: error.message };
+    }
+}
+
+async function showSheetStatus() {
+    if (!CONFIG.apiUrl) {
+        showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+        return;
+    }
+    
+    try {
+        const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'getStatus' });
+        
+        if (response.success) {
+            let statusText = `Fogli creati: ${response.totalSheets}\n`;
+            response.sheets.forEach(sheet => {
+                statusText += `- ${sheet.name}: ${sheet.rows} righe\n`;
+            });
+            
+            alert('Status Google Sheets:\n' + statusText);
+        } else {
+            showAlert('Errore status: ' + response.message, 'error');
+        }
+    } catch (error) {
+        showAlert('Errore connessione: ' + error.message, 'error');
+    }
+}
         // VERSIONE NO AUTO-SYNC - TUTTE LE FUNZIONI PULITE
         console.log('🚫 VERSIONE NO AUTO-SYNC CARICATA');
         
@@ -744,32 +859,43 @@
         }
 
         // GESTIONE SQUADRE - NO AUTO-SYNC
-       // Sostituisci addTeam() esistente
-function addTeam() {
+async function addTeam() {
+    console.log('Adding team...');
+    
     const teamName = document.getElementById('teamName').value.trim();
     if (!teamName) {
         showAlert('Inserisci il nome della squadra', 'error');
         return;
     }
 
-    const now = Date.now();
     const newTeam = {
-        id: now, // Usa timestamp come ID
+        id: Date.now(),
         name: teamName,
         players: [],
-        createdAt: now,
-        lastModified: now
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
     };
 
+    // Salva localmente
     teams.push(newTeam);
     saveDataLocally();
     document.getElementById('teamName').value = '';
     updateTeamSelects();
     displayTeams();
     
-    showAlert(`Squadra "${teamName}" aggiunta localmente!`, 'success');
+    // Salva incrementalmente sul server
+    const serverResponse = await saveTeamToServer(newTeam, 'ADD');
+    
+    if (serverResponse.success) {
+        if (serverResponse.local) {
+            showAlert(`Squadra "${teamName}" aggiunta localmente!`, 'success');
+        } else {
+            showAlert(`Squadra "${teamName}" aggiunta e salvata online!`, 'success');
+        }
+    } else {
+        showAlert(`Squadra "${teamName}" aggiunta localmente. Errore sync: ${serverResponse.message}`, 'warning');
+    }
 }
-
         function displayTeams() {
             const teamsList = document.getElementById('teamsList');
             if (teams.length === 0) {
@@ -830,76 +956,108 @@ function addTeam() {
             document.getElementById('playerPosition').value = '';
         }
 
-        function addPlayer() {
-            const playerName = document.getElementById('playerName').value.trim();
-            const playerPosition = document.getElementById('playerPosition').value.trim();
-            
-            if (!playerName) {
-                showAlert('Inserisci il nome del giocatore', 'error');
-                return;
-            }
+// AGGIUNGI GIOCATORE MODIFICATA
+async function addPlayer() {
+    const playerName = document.getElementById('playerName').value.trim();
+    const playerPosition = document.getElementById('playerPosition').value.trim();
+    
+    if (!playerName) {
+        showAlert('Inserisci il nome del giocatore', 'error');
+        return;
+    }
 
-            const team = teams.find(t => t.id === currentTeamId);
-            if (team) {
-                team.players.push({
-                    id: Date.now(),
-                    name: playerName,
-                    position: playerPosition || 'Giocatore',
-                    goals: 0,
-                    scalps: 0,
-                    matches: 0
-                });
-                saveDataLocally();
-                displayTeams();
-                closePlayerModal();
-                
-                console.log('👤 Giocatore aggiunto SOLO LOCALMENTE:', playerName);
+    const team = teams.find(t => t.id === currentTeamId);
+    if (team) {
+        const newPlayer = {
+            id: Date.now(),
+            name: playerName,
+            position: playerPosition || 'Giocatore',
+            goals: 0,
+            scalps: 0,
+            matches: 0,
+            createdAt: new Date().toISOString(),
+            lastModified: new Date().toISOString()
+        };
+        
+        team.players.push(newPlayer);
+        team.lastModified = new Date().toISOString();
+        
+        saveDataLocally();
+        displayTeams();
+        closePlayerModal();
+        
+        // Salva squadra aggiornata sul server
+        const serverResponse = await saveTeamToServer(team, 'UPDATE');
+        
+        if (serverResponse.success) {
+            if (!serverResponse.local) {
+                showAlert(`Giocatore "${playerName}" aggiunto e sincronizzato!`, 'success');
+            } else {
                 showAlert(`Giocatore "${playerName}" aggiunto localmente!`, 'success');
             }
+        } else {
+            showAlert(`Giocatore "${playerName}" aggiunto localmente!`, 'success');
         }
+    }
+}
+
 
         // GESTIONE PARTITE - NO AUTO-SYNC
-        function addMatch() {
-            const team1Id = parseInt(document.getElementById('team1').value);
-            const team2Id = parseInt(document.getElementById('team2').value);
-            const matchDate = document.getElementById('matchDate').value;
+ // AGGIUNGI PARTITA MODIFICATA
+async function addMatch() {
+    const team1Id = parseInt(document.getElementById('team1').value);
+    const team2Id = parseInt(document.getElementById('team2').value);
+    const matchDate = document.getElementById('matchDate').value;
 
-            if (!team1Id || !team2Id) {
-                showAlert('Seleziona entrambe le squadre', 'error');
-                return;
-            }
+    if (!team1Id || !team2Id) {
+        showAlert('Seleziona entrambe le squadre', 'error');
+        return;
+    }
 
-            if (team1Id === team2Id) {
-                showAlert('Seleziona due squadre diverse', 'error');
-                return;
-            }
+    if (team1Id === team2Id) {
+        showAlert('Seleziona due squadre diverse', 'error');
+        return;
+    }
 
-            const newMatch = {
-                id: Date.now(),
-                team1Id: team1Id,
-                team2Id: team2Id,
-                date: matchDate || new Date().toISOString(),
-                status: 'scheduled',
-                result: {
-                    team1Score: 0,
-                    team2Score: 0,
-                    team1Stats: {},
-                    team2Stats: {},
-                    team1MVP: null,
-                    team2MVP: null
-                }
-            };
+    const newMatch = {
+        id: Date.now(),
+        team1Id: team1Id,
+        team2Id: team2Id,
+        date: matchDate || new Date().toISOString(),
+        status: 'scheduled',
+        result: {
+            team1Score: 0,
+            team2Score: 0,
+            team1Stats: {},
+            team2Stats: {},
+            team1MVP: null,
+            team2MVP: null
+        },
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+    };
 
-            matches.push(newMatch);
-            saveDataLocally();
-            document.getElementById('team1').value = '';
-            document.getElementById('team2').value = '';
-            document.getElementById('matchDate').value = '';
-            displayMatches();
-            
-            console.log('⚽ Partita aggiunta SOLO LOCALMENTE');
+    // Salva localmente
+    matches.push(newMatch);
+    saveDataLocally();
+    document.getElementById('team1').value = '';
+    document.getElementById('team2').value = '';
+    document.getElementById('matchDate').value = '';
+    displayMatches();
+    
+    // Salva sul server
+    const serverResponse = await saveMatchToServer(newMatch, 'ADD');
+    
+    if (serverResponse.success) {
+        if (!serverResponse.local) {
+            showAlert('Partita programmata e sincronizzata!', 'success');
+        } else {
             showAlert('Partita programmata localmente!', 'success');
         }
+    } else {
+        showAlert('Partita programmata localmente!', 'success');
+    }
+}
 
         function displayMatches() {
             const matchesList = document.getElementById('matchesList');
@@ -1048,46 +1206,59 @@ function addTeam() {
             document.getElementById('resultModal').style.display = 'none';
         }
 
-        function saveMatchResult() {
-            const match = matches.find(m => m.id === currentMatchId);
-            const team1 = teams.find(t => t.id === match.team1Id);
-            const team2 = teams.find(t => t.id === match.team2Id);
+// SALVA RISULTATO PARTITA MODIFICATO
+async function saveMatchResult() {
+    const match = matches.find(m => m.id === currentMatchId);
+    const team1 = teams.find(t => t.id === match.team1Id);
+    const team2 = teams.find(t => t.id === match.team2Id);
 
-            match.result.team1Score = parseInt(document.getElementById('team1Score').value) || 0;
-            match.result.team2Score = parseInt(document.getElementById('team2Score').value) || 0;
+    match.result.team1Score = parseInt(document.getElementById('team1Score').value) || 0;
+    match.result.team2Score = parseInt(document.getElementById('team2Score').value) || 0;
 
-            // Salva MVP
-            const team1MVP = document.getElementById('team1MVP').value;
-            const team2MVP = document.getElementById('team2MVP').value;
-            match.result.team1MVP = team1MVP ? parseInt(team1MVP) : null;
-            match.result.team2MVP = team2MVP ? parseInt(team2MVP) : null;
+    // Salva MVP
+    const team1MVP = document.getElementById('team1MVP').value;
+    const team2MVP = document.getElementById('team2MVP').value;
+    match.result.team1MVP = team1MVP ? parseInt(team1MVP) : null;
+    match.result.team2MVP = team2MVP ? parseInt(team2MVP) : null;
 
-            match.result.team1Stats = {};
-            match.result.team2Stats = {};
+    match.result.team1Stats = {};
+    match.result.team2Stats = {};
 
-            team1.players.forEach(player => {
-                const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
-                const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
-                match.result.team1Stats[player.id] = { goals, scalps };
-            });
+    team1.players.forEach(player => {
+        const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
+        const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
+        match.result.team1Stats[player.id] = { goals, scalps };
+    });
 
-            team2.players.forEach(player => {
-                const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
-                const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
-                match.result.team2Stats[player.id] = { goals, scalps };
-            });
+    team2.players.forEach(player => {
+        const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
+        const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
+        match.result.team2Stats[player.id] = { goals, scalps };
+    });
 
-            match.status = 'completed';
-            
-            saveDataLocally();
-            displayMatches();
-            displayStandings();
-            displayStats();
-            closeResultModal();
-            
-            console.log('📊 Risultato salvato SOLO LOCALMENTE');
-            showAlert('✅ Risultato salvato localmente!', 'success');
+    match.status = 'completed';
+    match.lastModified = new Date().toISOString();
+    
+    // Salva localmente
+    saveDataLocally();
+    displayMatches();
+    displayStandings();
+    displayStats();
+    closeResultModal();
+    
+    // Salva risultato sul server
+    const serverResponse = await saveMatchResultToServer(match);
+    
+    if (serverResponse.success) {
+        if (!serverResponse.local) {
+            showAlert('Risultato salvato e sincronizzato!', 'success');
+        } else {
+            showAlert('Risultato salvato localmente!', 'success');
         }
+    } else {
+        showAlert('Risultato salvato localmente!', 'success');
+    }
+}
 
         // CLASSIFICA
         function displayStandings() {
@@ -1476,73 +1647,35 @@ function makeJSONPRequest(url, data = {}) {
     });
 }
 
-// Sync manuale corretta
+// SYNC MANUALE SEMPLIFICATO (ora carica semplicemente)
 async function manualSync() {
-    console.log('💾 SYNC MANUALE AVVIATO');
-    
+    await loadFromServer();
+}
+
+// MOSTRA STATUS SHEETS
+async function showSheetStatus() {
     if (!CONFIG.apiUrl) {
         showAlert('Configura prima l\'URL di Apps Script!', 'warning');
         return;
     }
     
-    updateSyncStatus('syncing');
-    
     try {
-        // Prima carica i dati dal server per il merge
-        console.log('📥 Caricamento dati server per merge...');
-        
-        let serverData = { teams: [], matches: [] };
-        try {
-            const serverResponse = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
-            if (serverResponse.success) {
-                serverData = {
-                    teams: serverResponse.teams || [],
-                    matches: serverResponse.matches || []
-                };
-                console.log('Server data:', serverData.teams.length, 'squadre,', serverData.matches.length, 'partite');
-            }
-        } catch (loadError) {
-            console.log('Impossibile caricare dati server, procedo con solo dati locali');
-        }
-        
-        // Merge dati locali con server
-        const localData = { teams: teams, matches: matches };
-        const mergedData = mergeDataClient(localData, serverData);
-        
-        console.log('Dati merged:', mergedData.teams.length, 'squadre,', mergedData.matches.length, 'partite');
-        
-        // Salva i dati merged
-        const response = await makeJSONPRequest(CONFIG.apiUrl, {
-            action: 'saveAll',
-            teams: mergedData.teams,
-            matches: mergedData.matches
-        });
-        
-        console.log('Risposta salvataggio:', response);
+        const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'getStatus' });
         
         if (response.success) {
-            // Aggiorna i dati locali con quelli merged
-            teams = mergedData.teams;
-            matches = mergedData.matches;
-            saveDataLocally();
-            updateUI();
+            let statusText = `Fogli creati: ${response.totalSheets}\n`;
+            response.sheets.forEach(sheet => {
+                statusText += `- ${sheet.name}: ${sheet.rows} righe\n`;
+            });
             
-            lastSyncTime = new Date().toISOString();
-            localStorage.setItem('pallascout_last_sync', lastSyncTime);
-            
-            showAlert('✅ Sincronizzazione completata!', 'success');
-            updateSyncStatus('online');
-            updateConnectionStatus();
+            alert('Status Google Sheets:\n' + statusText);
         } else {
-            throw new Error(response.message || 'Errore di sincronizzazione');
+            showAlert('Errore status: ' + response.message, 'error');
         }
     } catch (error) {
-        console.error('Errore sync:', error);
-        showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
-        updateSyncStatus('error');
+        showAlert('Errore connessione: ' + error.message, 'error');
     }
 }
-
 // Merge lato client semplificato
 function mergeDataClient(localData, serverData) {
     console.log('🔄 Merge lato client...');
@@ -1900,43 +2033,68 @@ async function manualSyncWithConflictResolution() {
     }
 }
         // CARICA DAL SERVER
-        async function loadFromServer() {
-            if (!CONFIG.apiUrl) {
-                showAlert('Configura prima l\'URL di Apps Script!', 'warning');
-                return;
-            }
+ // CARICAMENTO DAL SERVER MODIFICATO
+async function loadFromServer() {
+    if (!CONFIG.apiUrl) {
+        showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+        return;
+    }
+    
+    updateSyncStatus('syncing');
+    
+    try {
+        const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
+        
+        if (response.success) {
+            // Merge con i dati locali invece di sovrascrivere
+            const serverTeams = response.teams || [];
+            const serverMatches = response.matches || [];
             
-            if (!confirm('⚠️ Caricare i dati dal server? I dati locali verranno sovrascritti.')) {
-                return;
-            }
-            
-            updateSyncStatus('syncing');
-            
-            try {
-                const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'loadData' });
-                
-                if (response.success) {
-                    teams = response.teams || [];
-                    matches = response.matches || [];
-                    
-                    saveDataLocally();
-                    updateUI();
-                    
-                    lastSyncTime = new Date().toISOString();
-                    localStorage.setItem('pallascout_last_sync', lastSyncTime);
-                    updateConnectionStatus();
-                    
-                    showAlert(`✅ Caricati ${teams.length} squadre e ${matches.length} partite dal server!`, 'success');
-                    updateSyncStatus('online');
+            // Merge squadre
+            serverTeams.forEach(serverTeam => {
+                const existingIndex = teams.findIndex(t => t.id === serverTeam.id);
+                if (existingIndex === -1) {
+                    teams.push(serverTeam);
                 } else {
-                    throw new Error(response.message || 'Errore caricamento');
+                    // Merge giocatori
+                    const existing = teams[existingIndex];
+                    serverTeam.players.forEach(serverPlayer => {
+                        const playerIndex = existing.players.findIndex(p => p.id === serverPlayer.id);
+                        if (playerIndex === -1) {
+                            existing.players.push(serverPlayer);
+                        }
+                    });
+                    teams[existingIndex] = existing;
                 }
-            } catch (error) {
-                showAlert('❌ Errore caricamento: ' + error.message, 'error');
-                updateSyncStatus('error');
-                console.error('Load error:', error);
-            }
+            });
+            
+            // Merge partite
+            serverMatches.forEach(serverMatch => {
+                const existingIndex = matches.findIndex(m => m.id === serverMatch.id);
+                if (existingIndex === -1) {
+                    matches.push(serverMatch);
+                } else {
+                    // Se quella del server è più aggiornata, usala
+                    if (serverMatch.status === 'completed' && matches[existingIndex].status === 'scheduled') {
+                        matches[existingIndex] = serverMatch;
+                    }
+                }
+            });
+            
+            saveDataLocally();
+            updateUI();
+            
+            showAlert(`Caricati e sincronizzati: ${serverTeams.length} squadre, ${serverMatches.length} partite`, 'success');
+            updateSyncStatus('online');
+        } else {
+            throw new Error(response.message || 'Errore caricamento');
         }
+    } catch (error) {
+        showAlert('Errore caricamento: ' + error.message, 'error');
+        updateSyncStatus('error');
+        console.error('Load error:', error);
+    }
+}
 
         // EXPORT/IMPORT
         function exportData() {
