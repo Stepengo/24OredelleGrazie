@@ -1592,29 +1592,26 @@ function makeJSONPRequest(url, data = {}) {
         });
         
         // CODIFICA CORRETTA DEI DATI
-        if (data.teams || data.matches) {
-            try {
-                const jsonData = {
-                    teams: data.teams || [],
-                    matches: data.matches || []
-                };
-                
-                // Converti in JSON string
-                const jsonString = JSON.stringify(jsonData);
-                console.log('JSON da inviare:', jsonString.length, 'caratteri');
-                
-                // Codifica in base64
-                const encoded = btoa(unescape(encodeURIComponent(jsonString)));
-                params.append('data', encoded);
-                
-                console.log('Dati codificati per invio:', encoded.length, 'caratteri');
-                
-            } catch (encodeError) {
-                console.error('Errore codifica dati:', encodeError);
-                reject(new Error('Errore nella codifica dei dati'));
-                return;
-            }
-        }
+if (data.data) {
+    // Caso: passo già un payload codificato (es. saveTeamToServer)
+    params.append('data', data.data);
+} else if (data.teams || data.matches) {
+    // Caso: passo array di squadre/partite interi
+    try {
+        const jsonData = {
+            teams: data.teams || [],
+            matches: data.matches || []
+        };
+        const jsonString = JSON.stringify(jsonData);
+        const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+        params.append('data', encoded);
+    } catch (encodeError) {
+        console.error('Errore codifica dati:', encodeError);
+        reject(new Error('Errore nella codifica dei dati'));
+        return;
+    }
+}
+
         
         script.src = url + '?' + params.toString();
         
