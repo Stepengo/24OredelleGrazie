@@ -1647,33 +1647,54 @@ function makeJSONPRequest(url, data = {}) {
     });
 }
 
-// SYNC MANUALE SEMPLIFICATO (ora carica semplicemente)
+// SOSTITUISCI la funzione manualSync con questa versione incrementale
 async function manualSync() {
-    await loadFromServer();
-}
-
-// MOSTRA STATUS SHEETS
-async function showSheetStatus() {
+    console.log('💾 SYNC INCREMENTALE AVVIATO');
+    
     if (!CONFIG.apiUrl) {
         showAlert('Configura prima l\'URL di Apps Script!', 'warning');
         return;
     }
     
+    updateSyncStatus('syncing');
+    
     try {
-        const response = await makeJSONPRequest(CONFIG.apiUrl, { action: 'getStatus' });
+        let syncCount = 0;
         
-        if (response.success) {
-            let statusText = `Fogli creati: ${response.totalSheets}\n`;
-            response.sheets.forEach(sheet => {
-                statusText += `- ${sheet.name}: ${sheet.rows} righe\n`;
-            });
-            
-            alert('Status Google Sheets:\n' + statusText);
-        } else {
-            showAlert('Errore status: ' + response.message, 'error');
+        // Sincronizza tutte le squadre
+        for (const team of teams) {
+            const response = await saveTeamToServer(team, 'SYNC');
+            if (response.success && !response.local) {
+                syncCount++;
+            }
         }
+        
+        // Sincronizza tutte le partite
+        for (const match of matches) {
+            if (match.status === 'completed') {
+                const response = await saveMatchResultToServer(match);
+                if (response.success && !response.local) {
+                    syncCount++;
+                }
+            } else {
+                const response = await saveMatchToServer(match, 'SYNC');
+                if (response.success && !response.local) {
+                    syncCount++;
+                }
+            }
+        }
+        
+        lastSyncTime = new Date().toISOString();
+        localStorage.setItem('pallascout_last_sync', lastSyncTime);
+        
+        showAlert(`✅ Sincronizzati ${syncCount} elementi!`, 'success');
+        updateSyncStatus('online');
+        updateConnectionStatus();
+        
     } catch (error) {
-        showAlert('Errore connessione: ' + error.message, 'error');
+        showAlert('❌ Errore sincronizzazione: ' + error.message, 'error');
+        updateSyncStatus('error');
+        console.error('Sync error:', error);
     }
 }
 // Merge lato client semplificato
