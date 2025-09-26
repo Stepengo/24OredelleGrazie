@@ -2161,6 +2161,685 @@ async function loadFromServer() {
     .then(() => console.log("Service Worker registrato"))
     .catch(err => console.error("Errore Service Worker:", err));
 }
+
+        // SISTEMA COMPLETO MULTI-DISPOSITIVO - INTEGRABILE NEL TUO HTML
+
+// 1. CONFIGURAZIONE GLOBALE
+const ENTERPRISE_CONFIG = {
+    apiUrl: localStorage.getItem('pallascout_api_url') || '',
+    maxRetries: 3,
+    retryDelay: 1500,
+    autoSyncInterval: 25000,
+    deviceId: localStorage.getItem('device_id') || null,
+    lockTimeout: 180000, // 3 minuti
+    enableAutoSync: true
+};
+
+// 2. INIZIALIZZAZIONE SISTEMA
+function inizializzaSistemaEnterprise() {
+    if (!ENTERPRISE_CONFIG.deviceId) {
+        ENTERPRISE_CONFIG.deviceId = 'device_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6);
+        localStorage.setItem('device_id', ENTERPRISE_CONFIG.deviceId);
+    }
+    
+    console.log('🏢 Sistema Enterprise inizializzato - Dispositivo:', ENTERPRISE_CONFIG.deviceId);
+    
+    if (ENTERPRISE_CONFIG.enableAutoSync && ENTERPRISE_CONFIG.apiUrl) {
+        avviaAutoSync();
+    }
+}
+
+// 3. GENERATORE ID ROBUSTO
+function generaIdRobusto(tipo = 'item') {
+    const timestamp = Date.now();
+    const deviceShort = ENTERPRISE_CONFIG.deviceId.slice(-4);
+    const random = Math.random().toString(36).substr(2, 6);
+    const counter = (parseInt(localStorage.getItem('id_counter') || '0')) + 1;
+    
+    localStorage.setItem('id_counter', counter.toString());
+    
+    return `${tipo}_${timestamp}_${deviceShort}_${random}_${counter.toString().padStart(3, '0')}`;
+}
+
+// 4. SISTEMA RICHIESTE ROBUSTE
+async function makeRobustJSONPRequest(url, data, maxRetries = ENTERPRISE_CONFIG.maxRetries) {
+    let lastError;
+    
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+            console.log(`🔄 Tentativo ${attempt}/${maxRetries}:`, data.action);
+            
+            const response = await makeJSONPRequestWithTimeout(url, data, 10000);
+            
+            if (response && response.success) {
+                console.log('✅ Richiesta riuscita:', data.action);
+                return response;
+            } else if (response && response.retry && attempt < maxRetries) {
+                console.warn(`⚠️ Server richiede retry, tentativo ${attempt}`);
+                await sleep(ENTERPRISE_CONFIG.retryDelay * attempt);
+                continue;
+            } else {
+                console.warn('❌ Risposta negativa:', response);
+                return response || { success: false, message: 'Risposta non valida' };
+            }
+        } catch (error) {
+            lastError = error;
+            console.error(`❌ Errore tentativo ${attempt}:`, error.message);
+            
+            if (attempt < maxRetries) {
+                await sleep(ENTERPRISE_CONFIG.retryDelay * attempt);
+            }
+        }
+    }
+    
+    throw lastError || new Error('Max tentativi raggiunti');
+}
+
+// 5. JSONP CON TIMEOUT
+function makeJSONPRequestWithTimeout(url, data, timeout) {
+    return new Promise((resolve, reject) => {
+        const callbackName = 'jsonp_callback_' + Math.round(100000 * Math.random());
+        const script = document.createElement('script');
+        
+        // Parametri URL
+        const params = new URLSearchParams({
+            callback: callbackName,
+            action: data.action || 'test'
+        });
+        
+        // Codifica dati se presenti
+        if (data.data) {
+            params.append('data', data.data);
+        } else if (data.teams || data.matches || data.match) {
+            try {
+                const payload = {
+                    teams: data.teams || [],
+                    matches: data.matches || [],
+                    match: data.match || null,
+                    deviceId: ENTERPRISE_CONFIG.deviceId,
+                    timestamp: new Date().toISOString(),
+                    ...data
+                };
+                const jsonString = JSON.stringify(payload);
+                const encoded = btoa(unescape(encodeURIComponent(jsonString)));
+                params.append('data', encoded);
+            } catch (encodeError) {
+                console.error('Errore codifica:', encodeError);
+                reject(new Error('Errore codifica dati'));
+                return;
+            }
+        }
+        
+        script.src = url + '?' + params.toString();
+        
+        const timeoutId = setTimeout(() => {
+            cleanup();
+            reject(new Error('Timeout richiesta'));
+        }, timeout);
+        
+        window[callbackName] = function(response) {
+            clearTimeout(timeoutId);
+            cleanup();
+            resolve(response);
+        };
+        
+        function cleanup() {
+            if (script.parentNode) {
+                script.parentNode.removeChild(script);
+            }
+            delete window[callbackName];
+        }
+        
+        script.onerror = function() {
+            clearTimeout(timeoutId);
+            cleanup();
+            reject(new Error('Errore caricamento script'));
+        };
+        
+        document.head.appendChild(script);
+    });
+}
+
+// 6. CONTROLLO DUPLICATI
+async function verificaDuplicatiPartita(team1Id, team2Id, data) {
+    // Controllo locale
+    const duplicatoLocale = matches.find(match => {
+        const dataMatch = new Date(match.date).toDateString();
+        const dataInput = new Date(data).toDateString();
+        
+        return ((match.team1Id === team1Id && match.team2Id === team2Id) ||
+                (match.team1Id === team2Id && match.team2Id === team1Id)) &&
+               dataMatch === dataInput;
+    });
+    
+    if (duplicatoLocale) {
+        return { duplicato: true, locale: true, partita: duplicatoLocale };
+    }
+    
+    // Controllo server se disponibile
+    if (ENTERPRISE_CONFIG.apiUrl) {
+        try {
+            const response = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                action: 'checkDuplicate',
+                team1Id: team1Id,
+                team2Id: team2Id,
+                date: data
+            });
+            
+            if (response.success && response.exists) {
+                return { duplicato: true, locale: false, partita: response.match };
+            }
+        } catch (error) {
+            console.warn('Controllo duplicati server fallito:', error);
+        }
+    }
+    
+    return { duplicato: false };
+}
+
+// 7. SISTEMA DI LOCK SEMPLIFICATO
+const activeLocks = new Map();
+
+async function acquisciLockPartita(matchId, operazione = 'modifica') {
+    const lockKey = `match_${matchId}`;
+    
+    // Controllo lock locale
+    if (activeLocks.has(lockKey)) {
+        const lock = activeLocks.get(lockKey);
+        if (Date.now() - lock.timestamp < ENTERPRISE_CONFIG.lockTimeout) {
+            if (lock.deviceId === ENTERPRISE_CONFIG.deviceId) {
+                return true; // Ho già il lock
+            } else {
+                showAlert(`Partita in modifica da altro dispositivo (${operazione})`, 'warning');
+                return false;
+            }
+        }
+    }
+    
+    // Prova lock sul server
+    if (ENTERPRISE_CONFIG.apiUrl) {
+        try {
+            const response = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                action: 'acquireLock',
+                matchId: matchId,
+                deviceId: ENTERPRISE_CONFIG.deviceId,
+                operazione: operazione,
+                timeout: ENTERPRISE_CONFIG.lockTimeout
+            });
+            
+            if (response.success) {
+                activeLocks.set(lockKey, {
+                    matchId: matchId,
+                    deviceId: ENTERPRISE_CONFIG.deviceId,
+                    operazione: operazione,
+                    timestamp: Date.now()
+                });
+                return true;
+            } else if (response.locked) {
+                showAlert(`Partita in modifica da dispositivo ${response.lockedBy} (${response.operazione})`, 'warning');
+                return false;
+            }
+        } catch (error) {
+            console.warn('Lock server fallito, uso locale:', error);
+        }
+    }
+    
+    // Fallback su lock locale
+    activeLocks.set(lockKey, {
+        matchId: matchId,
+        deviceId: ENTERPRISE_CONFIG.deviceId,
+        operazione: operazione,
+        timestamp: Date.now()
+    });
+    
+    return true;
+}
+
+async function rilasciaLockPartita(matchId) {
+    const lockKey = `match_${matchId}`;
+    activeLocks.delete(lockKey);
+    
+    if (ENTERPRISE_CONFIG.apiUrl) {
+        try {
+            await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                action: 'releaseLock',
+                matchId: matchId,
+                deviceId: ENTERPRISE_CONFIG.deviceId
+            });
+        } catch (error) {
+            console.warn('Rilascio lock server fallito:', error);
+        }
+    }
+}
+
+// 8. LOADING OVERLAY
+function mostraCaricamento(show, messaggio = 'Caricamento...') {
+    let overlay = document.getElementById('loadingOverlay');
+    
+    if (show) {
+        if (!overlay) {
+            overlay = document.createElement('div');
+            overlay.id = 'loadingOverlay';
+            overlay.innerHTML = `
+                <div style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; 
+                           background: rgba(0,0,0,0.7); z-index: 9999; display: flex; 
+                           align-items: center; justify-content: center;">
+                    <div style="background: white; padding: 30px; border-radius: 10px; text-align: center; min-width: 250px;">
+                        <div style="border: 4px solid #f3f3f3; border-top: 4px solid #667eea; 
+                                   border-radius: 50%; width: 40px; height: 40px; 
+                                   animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                        <p id="loadingMessage" style="margin: 0; font-weight: 600; color: #333;">${messaggio}</p>
+                    </div>
+                </div>
+                <style>
+                    @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                </style>
+            `;
+            document.body.appendChild(overlay);
+        } else {
+            overlay.style.display = 'flex';
+            document.getElementById('loadingMessage').textContent = messaggio;
+        }
+    } else {
+        if (overlay) {
+            overlay.style.display = 'none';
+        }
+    }
+}
+
+// 9. FUNZIONE addMatch ENTERPRISE - SOSTITUISCE QUELLA ESISTENTE
+async function addMatchEnterprise() {
+    const team1Id = parseInt(document.getElementById('team1').value);
+    const team2Id = parseInt(document.getElementById('team2').value);
+    const matchDate = document.getElementById('matchDate').value || new Date().toISOString();
+
+    if (!team1Id || !team2Id) {
+        showAlert('Seleziona entrambe le squadre', 'error');
+        return;
+    }
+
+    if (team1Id === team2Id) {
+        showAlert('Seleziona due squadre diverse', 'error');
+        return;
+    }
+
+    mostraCaricamento(true, 'Verificando duplicati...');
+
+    try {
+        // 1. Verifica duplicati
+        const checkDuplicato = await verificaDuplicatiPartita(team1Id, team2Id, matchDate);
+        
+        if (checkDuplicato.duplicato) {
+            const team1Nome = teams.find(t => t.id === team1Id)?.name;
+            const team2Nome = teams.find(t => t.id === team2Id)?.name;
+            showAlert(`Partita tra ${team1Nome} e ${team2Nome} già esistente!`, 'error');
+            return;
+        }
+
+        mostraCaricamento(true, 'Creando partita...');
+
+        // 2. Crea partita con ID robusto
+        const nuovaPartita = {
+            id: generaIdRobusto('match'),
+            team1Id: team1Id,
+            team2Id: team2Id,
+            date: matchDate,
+            status: 'scheduled',
+            version: 1,
+            result: {
+                team1Score: 0,
+                team2Score: 0,
+                team1Stats: {},
+                team2Stats: {},
+                team1MVP: null,
+                team2MVP: null
+            },
+            createdAt: new Date().toISOString(),
+            createdBy: ENTERPRISE_CONFIG.deviceId,
+            lastModified: new Date().toISOString(),
+            lastModifiedBy: ENTERPRISE_CONFIG.deviceId
+        };
+
+        // 3. Salva localmente prima
+        matches.push(nuovaPartita);
+        saveDataLocally();
+
+        // 4. Aggiorna UI
+        document.getElementById('team1').value = '';
+        document.getElementById('team2').value = '';
+        document.getElementById('matchDate').value = '';
+        displayMatches();
+
+        // 5. Salva sul server
+        if (ENTERPRISE_CONFIG.apiUrl) {
+            try {
+                const serverResponse = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                    action: 'saveMatch',
+                    match: nuovaPartita
+                });
+
+                if (serverResponse.success) {
+                    showAlert('Partita creata e sincronizzata!', 'success');
+                } else {
+                    showAlert('Partita creata localmente. Sync server fallito.', 'warning');
+                }
+            } catch (error) {
+                showAlert('Partita creata localmente. Server non raggiungibile.', 'warning');
+            }
+        } else {
+            showAlert('Partita creata localmente!', 'success');
+        }
+
+    } catch (error) {
+        console.error('Errore creazione partita:', error);
+        showAlert('Errore creazione partita: ' + error.message, 'error');
+    } finally {
+        mostraCaricamento(false);
+    }
+}
+
+// 10. FUNZIONE saveMatchResult ENTERPRISE - SOSTITUISCE QUELLA ESISTENTE
+async function saveMatchResultEnterprise() {
+    const matchId = currentMatchId;
+    const partita = matches.find(m => m.id === matchId);
+    
+    if (!partita) {
+        showAlert('Partita non trovata', 'error');
+        return;
+    }
+
+    mostraCaricamento(true, 'Acquisendo lock...');
+
+    // 1. Acquisisci lock
+    const lockAcquisito = await acquisciLockPartita(matchId, 'salva_risultato');
+    if (!lockAcquisito) {
+        mostraCaricamento(false);
+        return;
+    }
+
+    try {
+        mostraCaricamento(true, 'Verificando versione...');
+
+        // 2. Controlla versione server (se disponibile)
+        if (ENTERPRISE_CONFIG.apiUrl) {
+            try {
+                const versionCheck = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                    action: 'getMatchVersion',
+                    matchId: matchId
+                });
+
+                if (versionCheck.success && versionCheck.version > (partita.version || 0)) {
+                    const procedi = confirm(
+                        '⚠️ La partita è stata modificata da un altro dispositivo.\n' +
+                        `Versione locale: ${partita.version || 0}\n` +
+                        `Versione server: ${versionCheck.version}\n\n` +
+                        'Continuare sovrascriverà le modifiche altrui. Procedere?'
+                    );
+
+                    if (!procedi) {
+                        await rilasciaLockPartita(matchId);
+                        mostraCaricamento(false);
+                        closeResultModal();
+                        return;
+                    }
+                }
+            } catch (error) {
+                console.warn('Controllo versione fallito:', error);
+            }
+        }
+
+        mostraCaricamento(true, 'Salvando risultato...');
+
+        // 3. Raccogli dati dal form
+        const team1 = teams.find(t => t.id === partita.team1Id);
+        const team2 = teams.find(t => t.id === partita.team2Id);
+
+        partita.result.team1Score = parseInt(document.getElementById('team1Score').value) || 0;
+        partita.result.team2Score = parseInt(document.getElementById('team2Score').value) || 0;
+
+        const team1MVP = document.getElementById('team1MVP').value;
+        const team2MVP = document.getElementById('team2MVP').value;
+        partita.result.team1MVP = team1MVP ? parseInt(team1MVP) : null;
+        partita.result.team2MVP = team2MVP ? parseInt(team2MVP) : null;
+
+        partita.result.team1Stats = {};
+        partita.result.team2Stats = {};
+
+        team1.players.forEach(player => {
+            const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
+            const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
+            partita.result.team1Stats[player.id] = { goals, scalps };
+        });
+
+        team2.players.forEach(player => {
+            const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
+            const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
+            partita.result.team2Stats[player.id] = { goals, scalps };
+        });
+
+        // 4. Aggiorna metadati
+        partita.status = 'completed';
+        partita.version = (partita.version || 0) + 1;
+        partita.lastModified = new Date().toISOString();
+        partita.lastModifiedBy = ENTERPRISE_CONFIG.deviceId;
+
+        // 5. Salva localmente
+        saveDataLocally();
+        displayMatches();
+        displayStandings();
+        displayStats();
+        closeResultModal();
+
+        // 6. Salva sul server
+        if (ENTERPRISE_CONFIG.apiUrl) {
+            try {
+                const saveResponse = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                    action: 'saveMatchResult',
+                    match: partita
+                });
+
+                if (saveResponse.success) {
+                    showAlert('Risultato salvato e sincronizzato!', 'success');
+                } else {
+                    showAlert('Risultato salvato localmente. Sync server fallito.', 'warning');
+                }
+            } catch (error) {
+                showAlert('Risultato salvato localmente. Server non raggiungibile.', 'warning');
+            }
+        } else {
+            showAlert('Risultato salvato localmente!', 'success');
+        }
+
+    } catch (error) {
+        console.error('Errore salvataggio risultato:', error);
+        showAlert('Errore salvataggio: ' + error.message, 'error');
+    } finally {
+        await rilasciaLockPartita(matchId);
+        mostraCaricamento(false);
+    }
+}
+
+// 11. AUTO-SYNC INTELLIGENTE
+function avviaAutoSync() {
+    console.log('🔄 Auto-sync avviato ogni', ENTERPRISE_CONFIG.autoSyncInterval / 1000, 'secondi');
+    
+    setInterval(async () => {
+        if (document.hidden || !ENTERPRISE_CONFIG.apiUrl) return;
+        
+        try {
+            await autoSyncIntelligente();
+        } catch (error) {
+            console.warn('Auto-sync fallito:', error);
+        }
+    }, ENTERPRISE_CONFIG.autoSyncInterval);
+}
+
+async function autoSyncIntelligente() {
+    const ultimaSync = localStorage.getItem('last_auto_sync');
+    
+    try {
+        const response = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+            action: 'getUpdates',
+            since: ultimaSync,
+            deviceId: ENTERPRISE_CONFIG.deviceId
+        });
+
+        if (response.success && (response.teams || response.matches)) {
+            let aggiornamenti = 0;
+            
+            // Merge squadre
+            if (response.teams) {
+                response.teams.forEach(serverTeam => {
+                    const localIndex = teams.findIndex(t => t.id === serverTeam.id);
+                    if (localIndex === -1) {
+                        teams.push(serverTeam);
+                        aggiornamenti++;
+                    } else if (new Date(serverTeam.lastModified || 0) > new Date(teams[localIndex].lastModified || 0)) {
+                        teams[localIndex] = serverTeam;
+                        aggiornamenti++;
+                    }
+                });
+            }
+
+            // Merge partite
+            if (response.matches) {
+                response.matches.forEach(serverMatch => {
+                    const localIndex = matches.findIndex(m => m.id === serverMatch.id);
+                    if (localIndex === -1) {
+                        matches.push(serverMatch);
+                        aggiornamenti++;
+                    } else if (new Date(serverMatch.lastModified || 0) > new Date(matches[localIndex].lastModified || 0)) {
+                        matches[localIndex] = serverMatch;
+                        aggiornamenti++;
+                    }
+                });
+            }
+
+            if (aggiornamenti > 0) {
+                saveDataLocally();
+                updateUI();
+                console.log(`🔄 Auto-sync: ${aggiornamenti} aggiornamenti applicati`);
+            }
+
+            localStorage.setItem('last_auto_sync', new Date().toISOString());
+            updateSyncStatus('online');
+        }
+    } catch (error) {
+        updateSyncStatus('error');
+        throw error;
+    }
+}
+
+// 12. SINCRONIZZAZIONE MANUALE COMPLETA
+async function syncCompletoEnterprise() {
+    if (!ENTERPRISE_CONFIG.apiUrl) {
+        showAlert('Configura prima l\'URL di Apps Script!', 'warning');
+        return;
+    }
+    
+    mostraCaricamento(true, 'Sincronizzazione completa...');
+    updateSyncStatus('syncing');
+    
+    try {
+        // Carica tutto dal server
+        const response = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+            action: 'loadAll'
+        });
+        
+        if (response.success) {
+            // Merge intelligente
+            let modificheLocali = 0;
+            let modificheServer = 0;
+            
+            // Merge squadre
+            if (response.teams) {
+                response.teams.forEach(serverTeam => {
+                    const localIndex = teams.findIndex(t => t.id === serverTeam.id);
+                    if (localIndex === -1) {
+                        teams.push(serverTeam);
+                        modificheServer++;
+                    }
+                });
+            }
+            
+            // Merge partite
+            if (response.matches) {
+                response.matches.forEach(serverMatch => {
+                    const localIndex = matches.findIndex(m => m.id === serverMatch.id);
+                    if (localIndex === -1) {
+                        matches.push(serverMatch);
+                        modificheServer++;
+                    }
+                });
+            }
+            
+            // Invia dati locali mancanti al server
+            const dataToSync = {
+                teams: teams.filter(t => !response.teams?.find(st => st.id === t.id)),
+                matches: matches.filter(m => !response.matches?.find(sm => sm.id === m.id))
+            };
+            
+            if (dataToSync.teams.length > 0 || dataToSync.matches.length > 0) {
+                await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
+                    action: 'syncData',
+                    teams: dataToSync.teams,
+                    matches: dataToSync.matches
+                });
+                modificheLocali = dataToSync.teams.length + dataToSync.matches.length;
+            }
+            
+            saveDataLocally();
+            updateUI();
+            
+            showAlert(
+                `✅ Sync completo! Server→Locale: ${modificheServer}, Locale→Server: ${modificheLocali}`, 
+                'success'
+            );
+            
+            localStorage.setItem('last_manual_sync', new Date().toISOString());
+            updateSyncStatus('online');
+            updateConnectionStatus();
+        }
+    } catch (error) {
+        showAlert('Errore sincronizzazione: ' + error.message, 'error');
+        updateSyncStatus('error');
+    } finally {
+        mostraCaricamento(false);
+    }
+}
+
+// 13. FUNZIONI UTILITY
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 14. SOSTITUZIONE FUNZIONI ESISTENTI
+function sostituisciFunzioniConVersioneEnterprise() {
+    // Sostituisci le funzioni esistenti
+    window.addMatch = addMatchEnterprise;
+    window.saveMatchResult = saveMatchResultEnterprise;
+    window.manualSync = syncCompletoEnterprise;
+    
+    console.log('✅ Funzioni sostituite con versioni Enterprise');
+}
+
+// 15. INIZIALIZZAZIONE AUTOMATICA
+document.addEventListener('DOMContentLoaded', function() {
+    inizializzaSistemaEnterprise();
+    sostituisciFunzioniConVersioneEnterprise();
+    
+    console.log('🚀 Sistema Enterprise Multi-Dispositivo attivo!');
+    console.log('📱 Dispositivo:', ENTERPRISE_CONFIG.deviceId);
+    console.log('🔄 Auto-sync:', ENTERPRISE_CONFIG.enableAutoSync ? 'ATTIVO' : 'DISATTIVO');
+});
+
+// 16. ESPOSIZIONE FUNZIONI GLOBALI
+window.ENTERPRISE_CONFIG = ENTERPRISE_CONFIG;
+window.inizializzaSistemaEnterprise = inizializzaSistemaEnterprise;
+window.addMatchEnterprise = addMatchEnterprise;
+window.saveMatchResultEnterprise = saveMatchResultEnterprise;
+window.syncCompletoEnterprise = syncCompletoEnterprise;
+window.mostraCaricamento = mostraCaricamento;
     </script>
 </body>
 </html>
