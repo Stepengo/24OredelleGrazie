@@ -2539,6 +2539,8 @@ async function addMatchEnterprise() {
 }
 
 // 10. FUNZIONE saveMatchResult ENTERPRISE - SOSTITUISCE QUELLA ESISTENTE
+// FIX PER ERRORE team1MVP - SOSTITUISCI LA TUA FUNZIONE saveMatchResultEnterprise
+
 async function saveMatchResultEnterprise() {
     const matchId = currentMatchId;
     const partita = matches.find(m => m.id === matchId);
@@ -2590,32 +2592,94 @@ async function saveMatchResultEnterprise() {
 
         mostraCaricamento(true, 'Salvando risultato...');
 
-        // 3. Raccogli dati dal form
+        // 3. Raccogli dati dal form con controlli di sicurezza
         const team1 = teams.find(t => t.id === partita.team1Id);
         const team2 = teams.find(t => t.id === partita.team2Id);
 
-        partita.result.team1Score = parseInt(document.getElementById('team1Score').value) || 0;
-        partita.result.team2Score = parseInt(document.getElementById('team2Score').value) || 0;
+        if (!team1 || !team2) {
+            throw new Error('Squadre non trovate');
+        }
 
-        const team1MVP = document.getElementById('team1MVP').value;
-        const team2MVP = document.getElementById('team2MVP').value;
-        partita.result.team1MVP = team1MVP ? parseInt(team1MVP) : null;
-        partita.result.team2MVP = team2MVP ? parseInt(team2MVP) : null;
+        // Inizializza result se non esiste
+        if (!partita.result) {
+            partita.result = {
+                team1Score: 0,
+                team2Score: 0,
+                team1Stats: {},
+                team2Stats: {},
+                team1MVP: null,
+                team2MVP: null
+            };
+        }
 
+        // Raccogli punteggi con validazione
+        const team1ScoreElement = document.getElementById('team1Score');
+        const team2ScoreElement = document.getElementById('team2Score');
+        
+        if (!team1ScoreElement || !team2ScoreElement) {
+            throw new Error('Elementi form punteggi non trovati');
+        }
+
+        partita.result.team1Score = parseInt(team1ScoreElement.value) || 0;
+        partita.result.team2Score = parseInt(team2ScoreElement.value) || 0;
+
+        // Raccogli MVP con controlli di sicurezza
+        const team1MVPElement = document.getElementById('team1MVP');
+        const team2MVPElement = document.getElementById('team2MVP');
+        
+        if (team1MVPElement && team1MVPElement.value) {
+            const mvpValue = parseInt(team1MVPElement.value);
+            partita.result.team1MVP = isNaN(mvpValue) ? null : mvpValue;
+        } else {
+            partita.result.team1MVP = null;
+        }
+
+        if (team2MVPElement && team2MVPElement.value) {
+            const mvpValue = parseInt(team2MVPElement.value);
+            partita.result.team2MVP = isNaN(mvpValue) ? null : mvpValue;
+        } else {
+            partita.result.team2MVP = null;
+        }
+
+        // Inizializza statistiche
         partita.result.team1Stats = {};
         partita.result.team2Stats = {};
 
-        team1.players.forEach(player => {
-            const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
-            const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
-            partita.result.team1Stats[player.id] = { goals, scalps };
-        });
+        // Raccogli statistiche team1 con controlli
+        if (team1.players && Array.isArray(team1.players)) {
+            team1.players.forEach(player => {
+                if (!player || !player.id) {
+                    console.warn('Giocatore team1 non valido:', player);
+                    return;
+                }
 
-        team2.players.forEach(player => {
-            const goals = parseInt(document.getElementById(`player_${player.id}_goals`).value) || 0;
-            const scalps = parseInt(document.getElementById(`player_${player.id}_scalps`).value) || 0;
-            partita.result.team2Stats[player.id] = { goals, scalps };
-        });
+                const goalsElement = document.getElementById(`player_${player.id}_goals`);
+                const scalpsElement = document.getElementById(`player_${player.id}_scalps`);
+                
+                const goals = goalsElement ? (parseInt(goalsElement.value) || 0) : 0;
+                const scalps = scalpsElement ? (parseInt(scalpsElement.value) || 0) : 0;
+                
+                partita.result.team1Stats[player.id] = { goals, scalps };
+            });
+        }
+
+        // Raccogli statistiche team2 con controlli
+        if (team2.players && Array.isArray(team2.players)) {
+            team2.players.forEach(player => {
+                if (!player || !player.id) {
+                    console.warn('Giocatore team2 non valido:', player);
+                    return;
+                }
+
+                const goalsElement = document.getElementById(`player_${player.id}_goals`);
+                const scalpsElement = document.getElementById(`player_${player.id}_scalps`);
+                
+                const goals = goalsElement ? (parseInt(goalsElement.value) || 0) : 0;
+                const scalps = scalpsElement ? (parseInt(scalpsElement.value) || 0) : 0;
+                
+                partita.result.team2Stats[player.id] = { goals, scalps };
+            });
+        }
 
         // 4. Aggiorna metadati
         partita.status = 'completed';
@@ -2623,14 +2687,24 @@ async function saveMatchResultEnterprise() {
         partita.lastModified = new Date().toISOString();
         partita.lastModifiedBy = ENTERPRISE_CONFIG.deviceId;
 
-        // 5. Salva localmente
+        // 5. Validazione finale
+        console.log('Dati risultato validati:', {
+            team1Score: partita.result.team1Score,
+            team2Score: partita.result.team2Score,
+            team1MVP: partita.result.team1MVP,
+            team2MVP: partita.result.team2MVP,
+            team1Stats: Object.keys(partita.result.team1Stats).length,
+            team2Stats: Object.keys(partita.result.team2Stats).length
+        });
+
+        // 6. Salva localmente
         saveDataLocally();
         displayMatches();
         displayStandings();
         displayStats();
         closeResultModal();
 
-        // 6. Salva sul server
+        // 7. Salva sul server
         if (ENTERPRISE_CONFIG.apiUrl) {
             try {
                 const saveResponse = await makeRobustJSONPRequest(ENTERPRISE_CONFIG.apiUrl, {
@@ -2641,10 +2715,11 @@ async function saveMatchResultEnterprise() {
                 if (saveResponse.success) {
                     showAlert('Risultato salvato e sincronizzato!', 'success');
                 } else {
-                    showAlert('Risultato salvato localmente. Sync server fallito.', 'warning');
+                    showAlert('Risultato salvato localmente. Sync server fallito: ' + (saveResponse.message || 'Errore sconosciuto'), 'warning');
                 }
             } catch (error) {
-                showAlert('Risultato salvato localmente. Server non raggiungibile.', 'warning');
+                console.error('Errore sync server:', error);
+                showAlert('Risultato salvato localmente. Server non raggiungibile: ' + error.message, 'warning');
             }
         } else {
             showAlert('Risultato salvato localmente!', 'success');
@@ -2653,13 +2728,86 @@ async function saveMatchResultEnterprise() {
     } catch (error) {
         console.error('Errore salvataggio risultato:', error);
         showAlert('Errore salvataggio: ' + error.message, 'error');
+        
+        // Log dettagliato per debug
+        console.error('Dettagli errore:', {
+            partita: partita,
+            team1Id: partita?.team1Id,
+            team2Id: partita?.team2Id,
+            result: partita?.result
+        });
+        
     } finally {
         await rilasciaLockPartita(matchId);
         mostraCaricamento(false);
     }
 }
 
-// 11. AUTO-SYNC INTELLIGENTE
+// AGGIUNGI ANCHE QUESTA FUNZIONE DI DEBUG
+function debugPartitaCorrente() {
+    const matchId = currentMatchId;
+    const partita = matches.find(m => m.id === matchId);
+    
+    console.log('=== DEBUG PARTITA CORRENTE ===');
+    console.log('Match ID:', matchId);
+    console.log('Partita trovata:', !!partita);
+    
+    if (partita) {
+        console.log('Partita:', partita);
+        console.log('Team1 ID:', partita.team1Id);
+        console.log('Team2 ID:', partita.team2Id);
+        console.log('Result:', partita.result);
+        
+        const team1 = teams.find(t => t.id === partita.team1Id);
+        const team2 = teams.find(t => t.id === partita.team2Id);
+        
+        console.log('Team1 trovato:', !!team1, team1?.name);
+        console.log('Team2 trovato:', !!team2, team2?.name);
+        
+        if (team1) {
+            console.log('Team1 players:', team1.players?.length || 0);
+        }
+        if (team2) {
+            console.log('Team2 players:', team2.players?.length || 0);
+        }
+    }
+    
+    // Controlla elementi form
+    console.log('Form elementi:');
+    console.log('team1Score:', !!document.getElementById('team1Score'));
+    console.log('team2Score:', !!document.getElementById('team2Score'));
+    console.log('team1MVP:', !!document.getElementById('team1MVP'));
+    console.log('team2MVP:', !!document.getElementById('team2MVP'));
+    
+    console.log('=== FINE DEBUG ===');
+}
+
+// FUNZIONE PER VALIDARE DATI PRIMA DEL SALVATAGGIO
+function validaDatiRisultato(partita) {
+    const errori = [];
+    
+    if (!partita) {
+        errori.push('Partita non definita');
+        return errori;
+    }
+    
+    if (!partita.team1Id || !partita.team2Id) {
+        errori.push('ID squadre mancanti');
+    }
+    
+    const team1 = teams.find(t => t.id === partita.team1Id);
+    const team2 = teams.find(t => t.id === partita.team2Id);
+    
+    if (!team1) errori.push(`Team1 (${partita.team1Id}) non trovato`);
+    if (!team2) errori.push(`Team2 (${partita.team2Id}) non trovato`);
+    
+    if (!partita.result) {
+        errori.push('Oggetto result non inizializzato');
+    }
+    
+    return errori;
+    
+}// 11. AUTO-SYNC INTELLIGENTE
 function avviaAutoSync() {
     console.log('🔄 Auto-sync avviato ogni', ENTERPRISE_CONFIG.autoSyncInterval / 1000, 'secondi');
     
