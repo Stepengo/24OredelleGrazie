@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torneo Pallascout</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            text-align: center;
+        }
+
+        .header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+            font-size: 2.5em;
+        }
+
+        .nav-tabs {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+
+        .nav-tab {
+            padding: 12px 24px;
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .nav-tab:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15);
+        }
+
+        .nav-tab.active {
+            background: #3498db;
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 16px;
+            transition: border-color 0.3s ease;
+        }
+
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus {
+            border-color: #3498db;
+            outline: none;
+        }
+
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin: 5px;
+        }
+
+        .btn-primary {
+            background: #3498db;
+            color: white;
+        }
+
+        .btn-success {
+            background: #27ae60;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #e74c3c;
+            color: white;
+        }
+
+        .btn-warning {
+            background: #f39c12;
+            color: white;
+        }
+
+        .btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+        }
+
+        .card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            margin: 10px 0;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+            transition: transform 0.3s ease;
+        }
+
+        .card:hover {
+            transform: translateY(-2px);
+        }
+
+        .player-list {
+            display: grid;
+            gap: 10px;
+            margin-top: 10px;
+        }
+
+        .player-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+
+        .match-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+            gap: 20px;
+        }
+
+        .match-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        }
+
+        .match-header {
+            text-align: center;
+            margin-bottom: 15px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+
+        .teams-display {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 15px 0;
+        }
+
+        .team-info {
+            text-align: center;
+            flex: 1;
+        }
+
+        .vs {
+            margin: 0 20px;
+            font-size: 20px;
+            font-weight: bold;
+            color: #3498db;
+        }
+
+        .stats-input {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+
+        .stats-input input {
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            text-align: center;
+        }
+
+        .mvp-selection {
+            margin: 10px 0;
+        }
+
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        .table th, .table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        .table th {
+            background: #3498db;
+            color: white;
+        }
+
+        .table tr:hover {
+            background: #f5f5f5;
+        }
+
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+
+        .modal-content {
+            background-color: white;
+            margin: 5% auto;
+            padding: 20px;
+            border-radius: 10px;
+            width: 90%;
+            max-width: 600px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .close:hover {
+            color: #000;
+        }
+
+        @media (max-width: 768px) {
+            .nav-tabs {
+                flex-wrap: wrap;
+            }
+            
+            .nav-tab {
+                font-size: 14px;
+                padding: 8px 16px;
+            }
+            
+            .match-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .stats-input {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🏆 Torneo Pallascout</h1>
+            <div class="nav-tabs">
+                <button class="nav-tab active" onclick="showTab('teams')">Squadre</button>
+                <button class="nav-tab" onclick="showTab('matches')">Partite</button>
+                <button class="nav-tab" onclick="showTab('referee')">Arbitro</button>
+                <button class="nav-tab" onclick="showTab('standings')">Classifica</button>
+                <button class="nav-tab" onclick="showTab('stats')">Statistiche</button>
+                <button class="nav-tab" onclick="showTab('admin')">Admin</button>
+            </div>
+        </div>
+
+        <!-- Tab Squadre -->
+        <div id="teams" class="tab-content active">
+            <h2>Gestione Squadre</h2>
+            <div class="form-group">
+                <label>Nome Squadra:</label>
+                <input type="text" id="teamName" placeholder="Inserisci nome squadra">
+            </div>
+            <button class="btn btn-primary" onclick="addTeam()">Aggiungi Squadra</button>
+            
+            <div id="teamsList"></div>
+        </div>
+
+        <!-- Tab Partite -->
+        <div id="matches" class="tab-content">
+            <h2>Gestione Partite</h2>
+            <div class="form-group">
+                <label>Squadra Casa:</label>
+                <select id="homeTeam"></select>
+            </div>
+            <div class="form-group">
+                <label>Squadra Ospite:</label>
+                <select id="awayTeam"></select>
+            </div>
+            <div class="form-group">
+                <label>Campo:</label>
+                <input type="text" id="matchField" placeholder="Campo 1">
+            </div>
+            <button class="btn btn-primary" onclick="createMatch()">Crea Partita</button>
+            
+            <div id="matchesList"></div>
+        </div>
+
+        <!-- Tab Arbitro -->
+        <div id="referee" class="tab-content">
+            <h2>Pannello Arbitro</h2>
+            <div style="margin-bottom: 20px; text-align: center;">
+                <button class="btn btn-info" onclick="setArbitratorName()">👤 Imposta Nome Arbitro</button>
+                <span id="arbitratorDisplay" style="margin-left: 15px; font-weight: bold;"></span>
+            </div>
+            <div class="form-group">
+                <label>Seleziona Partita da Arbitrare:</label>
+                <select id="refereeMatchSelect" onchange="loadRefereeMatch()"></select>
+            </div>
+            <div id="refereePanel"></div>
+        </div>
+
+        <!-- Tab Classifica -->
+        <div id="standings" class="tab-content">
+            <h2>Classifica Generale</h2>
+            <div id="standingsTable"></div>
+        </div>
+
+        <!-- Tab Statistiche -->
+        <div id="stats" class="tab-content">
+            <h2>Statistiche</h2>
+            <div id="statsContent"></div>
+        </div>
+
+        <!-- Tab Admin -->
+        <div id="admin" class="tab-content">
+            <h2>🏆 Pannello Organizzatore</h2>
+            
+            <div class="card">
+                <h3>📥 Importa Report Arbitri</h3>
+                <p>Importa i report ricevuti dagli arbitri per aggiornare il database centrale:</p>
+                
+                <div style="margin: 20px 0;">
+                    <h4>Metodo 1: Importa Report Multipli</h4>
+                    <textarea id="bulkReportsInput" 
+                              style="width: 100%; height: 200px; margin: 10px 0;" 
+                              placeholder="Incolla qui tutti i report degli arbitri, uno dopo l'altro...
+
+🏆 REPORT PARTITA PALLASCOUT 🏆
+📅 Data: 27/9/2025, 15:30:00
+🏟️ Campo: Campo 1
+📊 Risultato: Squadra A 3 - 1 Squadra B
+...
+
+🏆 REPORT PARTITA PALLASCOUT 🏆
+📅 Data: 27/9/2025, 16:00:00
+🏟️ Campo: Campo 2
+📊 Risultato: Squadra C 2 - 2 Squadra D
+..."></textarea>
+                    <button class="btn btn-success" onclick="processBulkReports()">
+                        📊 Elabora Tutti i Report
+                    </button>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Metodo 2: Importa File Report</h4>
+                    <input type="file" id="reportFilesInput" multiple accept=".txt,.json" 
+                           onchange="processReportFiles(event)">
+                    <p style="font-size: 12px; color: #666;">Supporta file .txt e .json</p>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Metodo 3: Importa da JSON Completo</h4>
+                    <input type="file" id="jsonImportInput" accept=".json" 
+                           onchange="importCompleteData(event)">
+                    <p style="font-size: 12px; color: #666;">Importa database completo da un altro organizzatore</p>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>📊 Stato Partite</h3>
+                <div id="matchStatusSummary"></div>
+                <button class="btn btn-info" onclick="showDetailedMatchStatus()">
+                    📋 Dettagli Partite
+                </button>
+            </div>
+
+            <div class="card">
+                <h3>💾 Esporta Dati Completi</h3>
+                <p>Esporta tutti i dati del torneo in diversi formati:</p>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    <button class="btn btn-primary" onclick="exportCompleteJSON()">
+                        📄 Esporta JSON Completo
+                    </button>
+                    <button class="btn btn-success" onclick="exportExcelFormat()">
+                        📊 Esporta per Excel
+                    </button>
+                    <button class="btn btn-warning" onclick="exportPrintableReport()">
+                        🖨️ Report Stampabile
+                    </button>
+                    <button class="btn btn-info" onclick="exportWebPage()">
+                        🌐 Pagina Web Risultati
+                    </button>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>🔧 Strumenti Admin</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                    <button class="btn btn-warning" onclick="validateData()">
+                        ✅ Valida Dati
+                    </button>
+                    <button class="btn btn-info" onclick="showDataStatistics()">
+                        📈 Statistiche Database
+                    </button>
+                    <button class="btn btn-success" onclick="backupData()">
+                        💾 Backup Completo
+                    </button>
+                    <button class="btn btn-danger" onclick="resetTournament()">
+                        🗑️ Reset Torneo
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal per aggiungere giocatori -->
+    <div id="playerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closePlayerModal()">&times;</span>
+            <h3 id="modalTitle">Aggiungi Giocatore</h3>
+            <div class="form-group">
+                <label>Nome Giocatore:</label>
+                <input type="text" id="playerName">
+            </div>
+            <div class="form-group">
+                <label>Numero Maglia:</label>
+                <input type="number" id="playerNumber" min="1">
+            </div>
+            <button class="btn btn-primary" onclick="addPlayer()">Aggiungi</button>
+        </div>
+    </div>
+
+    <script>
+        // Strutture dati
+        let teams = JSON.parse(localStorage.getItem('pallascout_teams') || '[]');
+        let matches = JSON.parse(localStorage.getItem('pallascout_matches') || '[]');
+        let currentTeamId = null;
+
+        // Funzioni di salvataggio
+        function saveData() {
+            localStorage.setItem('pallascout_teams', JSON.stringify(teams));
+            localStorage.setItem('pallascout_matches', JSON.stringify(matches));
+        }
+
+        // Gestione tab
+        function showTab(tabName) {
+            document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+            document.querySelectorAll('.nav-tab').forEach(tab => tab.classList.remove('active'));
+            
+            document.getElementById(tabName).classList.add('active');
+            event.target.classList.add('active');
+            
+            if (tabName === 'matches') {
+                updateTeamSelects();
+                displayMatches();
+            } else if (tabName === 'referee') {
+                updateRefereeMatchSelect();
+                updateArbitratorDisplay();
+            } else if (tabName === 'standings') {
+                displayStandings();
+            } else if (tabName === 'stats') {
+                displayStats();
+            } else if (tabName === 'teams') {
+                displayTeams();
+            } else if (tabName === 'admin') {
+                updateMatchStatusSummary();
+            }
+        }
+
+        // Gestione squadre
+        function addTeam() {
+            const teamName = document.getElementById('teamName').value.trim();
+            if (!teamName) {
+                alert('Inserisci un nome per la squadra');
+                return;
+            }
+
+            const team = {
+                id: Date.now(),
+                name: teamName,
+                players: [],
+                stats: {
+                    matches: 0,
+                    wins: 0,
+                    draws: 0,
+                    losses: 0,
+                    points: 0,
+                    goalsFor: 0,
+                    goalsAgainst: 0,
+                    scalpFor: 0,
+                    scalpAgainst: 0
+                }
+            };
+
+            teams.push(team);
+            saveData();
+            document.getElementById('teamName').value = '';
+            displayTeams();
+        }
+
+        function displayTeams() {
+            const teamsList = document.getElementById('teamsList');
+            teamsList.innerHTML = '';
+
+            teams.forEach(team => {
+                const teamCard = document.createElement('div');
+                teamCard.className = 'card';
+                teamCard.innerHTML = `
+                    <h3>${team.name}</h3>
+                    <p>Giocatori: ${team.players.length}</p>
+                    <div class="player-list" id="players-${team.id}">
+                        ${team.players.map(player => `
+                            <div class="player-item">
+                                <span>#${player.number} - ${player.name}</span>
+                                <button class="btn btn-danger" onclick="removePlayer(${team.id}, ${player.id})">Rimuovi</button>
+                            </div>
+                        `).join('')}
+                    </div>
+                    <button class="btn btn-success" onclick="openPlayerModal(${team.id})">Aggiungi Giocatore</button>
+                    <button class="btn btn-danger" onclick="removeTeam(${team.id})">Elimina Squadra</button>
+                `;
+                teamsList.appendChild(teamCard);
+            });
+        }
+
+        function openPlayerModal(teamId) {
+            currentTeamId = teamId;
+            const team = teams.find(t => t.id === teamId);
+            document.getElementById('modalTitle').textContent = `Aggiungi Giocatore - ${team.name}`;
+            document.getElementById('playerModal').style.display = 'block';
+        }
+
+        function closePlayerModal() {
+            document.getElementById('playerModal').style.display = 'none';
+            document.getElementById('playerName').value = '';
+            document.getElementById('playerNumber').value = '';
+        }
+
+        function addPlayer() {
+            const playerName = document.getElementById('playerName').value.trim();
+            const playerNumber = parseInt(document.getElementById('playerNumber').value);
+            
+            if (!playerName || !playerNumber) {
+                alert('Inserisci nome e numero del giocatore');
+                return;
+            }
+
+            const team = teams.find(t => t.id === currentTeamId);
+            if (team.players.some(p => p.number === playerNumber)) {
+                alert('Numero maglia già utilizzato');
+                return;
+            }
+
+            const player = {
+                id: Date.now(),
+                name: playerName,
+                number: playerNumber,
+                stats: {
+                    goals: 0,
+                    scalps: 0,
+                    mvp: 0
+                }
+            };
+
+            team.players.push(player);
+            saveData();
+            closePlayerModal();
+            displayTeams();
+        }
+
+        function removePlayer(teamId, playerId)
