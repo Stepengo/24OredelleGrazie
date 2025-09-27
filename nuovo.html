@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>Torneo Pallascout - App Mobile</title>
+    <title>Torneo Pallascout - Real-time</title>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
     <style>
         * {
@@ -35,7 +35,6 @@
             -moz-osx-font-smoothing: grayscale;
         }
 
-        /* Mobile-first design */
         .container {
             max-width: 100%;
             margin: 0 auto;
@@ -69,7 +68,37 @@
             background-clip: text;
         }
 
-        /* Bottom Navigation for Mobile */
+        .connection-status {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+
+        .status-online {
+            color: var(--success);
+        }
+
+        .status-offline {
+            color: var(--danger);
+        }
+
+        .status-connecting {
+            color: var(--warning);
+        }
+
+        .pulse {
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
         .bottom-nav {
             position: fixed;
             bottom: 0;
@@ -221,6 +250,12 @@
             box-shadow: var(--shadow-lg);
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            transform: none;
+            cursor: not-allowed;
+        }
+
         .btn-small {
             padding: 8px 16px;
             font-size: 0.85rem;
@@ -260,7 +295,6 @@
             }
         }
 
-        /* Player Management */
         .player-form {
             display: flex;
             gap: 10px;
@@ -511,6 +545,7 @@
 
         .notification.show { transform: translateY(0); }
         .notification.error { background: var(--danger); }
+        .notification.warning { background: var(--warning); }
 
         .empty-state {
             text-align: center;
@@ -540,13 +575,129 @@
             border-radius: 12px;
             margin-bottom: 20px;
         }
+
+        .firebase-config {
+            background: #fef3c7;
+            border: 2px solid #f59e0b;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+
+        .firebase-config h3 {
+            color: #92400e;
+            margin-bottom: 15px;
+        }
+
+        .config-form {
+            display: grid;
+            gap: 15px;
+        }
+
+        @media (min-width: 768px) {
+            .config-form {
+                grid-template-columns: 1fr 1fr;
+            }
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 3000;
+            backdrop-filter: blur(5px);
+        }
+
+        .loading-spinner {
+            background: white;
+            padding: 30px;
+            border-radius: 16px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 4px solid #e2e8f0;
+            border-top: 4px solid var(--primary);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
             <h1><i class="fas fa-trophy"></i> Torneo Pallascout</h1>
-            <p>Gestione Mobile per Arbitri</p>
+            <p>Gestione Real-time Multi-Arbitro</p>
+            <div id="connectionStatus" class="connection-status">
+                <i class="fas fa-circle status-connecting pulse"></i>
+                <span>Inizializzazione...</span>
+            </div>
+        </div>
+
+        <!-- Configurazione Firebase -->
+        <div id="firebaseConfig" class="firebase-config">
+            <h3><i class="fas fa-cog"></i> Configurazione Database</h3>
+            <p>Per utilizzare l'app con sincronizzazione real-time, inserisci la configurazione Firebase:</p>
+            
+            <div class="config-form">
+                <div class="form-group">
+                    <label>API Key</label>
+                    <input type="text" id="apiKey" placeholder="AIzaSy...">
+                </div>
+                <div class="form-group">
+                    <label>Auth Domain</label>
+                    <input type="text" id="authDomain" placeholder="your-project.firebaseapp.com">
+                </div>
+                <div class="form-group">
+                    <label>Database URL</label>
+                    <input type="text" id="databaseURL" placeholder="https://your-project.firebaseio.com">
+                </div>
+                <div class="form-group">
+                    <label>Project ID</label>
+                    <input type="text" id="projectId" placeholder="your-project-id">
+                </div>
+            </div>
+            
+            <button class="btn" onclick="initializeFirebase()">
+                <i class="fas fa-rocket"></i> Inizializza Database
+            </button>
+            
+            <details style="margin-top: 20px;">
+                <summary style="cursor: pointer; font-weight: bold;">🔧 Come configurare Firebase (clicca per aprire)</summary>
+                <div style="margin-top: 15px; line-height: 1.6;">
+                    <h4>1. Crea progetto Firebase:</h4>
+                    <p>• Vai su <strong>console.firebase.google.com</strong></p>
+                    <p>• Clicca "Crea un progetto"</p>
+                    <p>• Scegli un nome (es. "torneo-pallascout")</p>
+                    
+                    <h4>2. Configura Realtime Database:</h4>
+                    <p>• Nel menu laterale: "Realtime Database"</p>
+                    <p>• Clicca "Crea database"</p>
+                    <p>• Scegli modalità "Test" per iniziare</p>
+                    
+                    <h4>3. Ottieni configurazione:</h4>
+                    <p>• Vai in "Impostazioni progetto" (icona ingranaggio)</p>
+                    <p>• Scorri fino a "Le tue app"</p>
+                    <p>• Clicca "Aggiungi app" → "Web" (icona &lt;/&gt;)</p>
+                    <p>• Copia i valori da firebaseConfig</p>
+                </div>
+            </details>
         </div>
 
         <!-- Bottom Navigation -->
@@ -578,15 +729,28 @@
             <h2><i class="fas fa-users"></i> Gestione Squadre</h2>
             
             <div class="form-group">
-                <label><i class="fas fa-file-csv"></i> Importa da Google Form (CSV)</label>
-                <input type="file" id="csvFile" accept=".csv" onchange="importFromCSV(this)">
+                <label><i class="fas fa-link"></i> Importa da Google Sheets</label>
+                <input type="text" id="googleSheetsUrl" placeholder="Incolla qui l'URL del Google Sheets">
+                <button type="button" class="btn btn-info" onclick="importFromGoogleSheets()" style="margin-top: 10px;">
+                    <i class="fas fa-download"></i> Importa Squadre
+                </button>
                 <div class="csv-example">
-                    <strong>Formato CSV:</strong><br>
-                    Nome Squadra, Nome Giocatore 1, N° Maglia 1, Nome Giocatore 2, N° Maglia 2, ...
-                    <br><br>
-                    <strong>Esempio:</strong><br>
-                    Leoni Rossi, Marco Rossi, 7, Luigi Bianchi, 9, Paolo Verde, 11
+                    <strong>Setup Google Sheets:</strong><br>
+                    1. Apri il foglio creato dal Google Form<br>
+                    2. Clicca "Condividi" → "Ottieni link" → "Chiunque abbia il link può visualizzare"<br>
+                    3. Copia e incolla l'URL qui sopra<br>
+                    <br>
+                    <strong>Formato colonne:</strong><br>
+                    A: Nome Squadra | B: Nome Giocatore 1 | C: N° Maglia 1 | D: Nome Giocatore 2 | E: N° Maglia 2 | ...
                 </div>
+            </div>
+            
+            <hr style="margin: 30px 0; border: none; height: 1px; background: #e2e8f0;">
+            
+            <div class="form-group">
+                <label><i class="fas fa-file-csv"></i> Oppure carica file CSV</label>
+                <input type="file" id="csvFile" accept=".csv" onchange="importFromCSV(this)">
+                <small>Come backup se Google Sheets non funziona</small>
             </div>
 
             <hr style="margin: 30px 0; border: none; height: 1px; background: #e2e8f0;">
@@ -707,13 +871,34 @@
     </div>
 
     <div id="notification" class="notification"></div>
+    
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="loading-spinner">
+            <div class="spinner"></div>
+            <p>Sincronizzazione in corso...</p>
+        </div>
+    </div>
+
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.0/firebase-database-compat.js"></script>
 
     <script>
-        let teams = JSON.parse(localStorage.getItem('pallascout_teams')) || [];
-        let matches = JSON.parse(localStorage.getItem('pallascout_matches')) || [];
+        // Variabili globali
+        let firebase = null;
+        let database = null;
+        let teams = [];
+        let matches = [];
         let currentPlayers = [];
+        let isFirebaseInitialized = false;
+        let dataListeners = [];
 
+        // Inizializzazione
         document.addEventListener('DOMContentLoaded', function() {
+            // Carica configurazione salvata
+            loadSavedConfig();
+            
+            // Inizializza interfaccia
             updateTeamsList();
             updateMatchesList();
             updateRefereeMatches();
@@ -722,6 +907,158 @@
             populateTeamSelects();
         });
 
+        // Configurazione Firebase
+        function loadSavedConfig() {
+            const savedConfig = localStorage.getItem('firebase_config');
+            if (savedConfig) {
+                const config = JSON.parse(savedConfig);
+                document.getElementById('apiKey').value = config.apiKey || '';
+                document.getElementById('authDomain').value = config.authDomain || '';
+                document.getElementById('databaseURL').value = config.databaseURL || '';
+                document.getElementById('projectId').value = config.projectId || '';
+                
+                // Auto-inizializza se configurazione completa
+                if (config.apiKey && config.authDomain && config.databaseURL && config.projectId) {
+                    initializeFirebase();
+                }
+            }
+        }
+
+        function saveConfig(config) {
+            localStorage.setItem('firebase_config', JSON.stringify(config));
+        }
+
+        function initializeFirebase() {
+            const config = {
+                apiKey: document.getElementById('apiKey').value.trim(),
+                authDomain: document.getElementById('authDomain').value.trim(),
+                databaseURL: document.getElementById('databaseURL').value.trim(),
+                projectId: document.getElementById('projectId').value.trim(),
+                storageBucket: document.getElementById('projectId').value.trim() + '.appspot.com',
+                messagingSenderId: '123456789',
+                appId: '1:123456789:web:abcdef123456'
+            };
+
+            if (!config.apiKey || !config.authDomain || !config.databaseURL || !config.projectId) {
+                showNotification('Compila tutti i campi della configurazione Firebase', 'error');
+                return;
+            }
+
+            showLoadingOverlay(true);
+            updateConnectionStatus('connecting', 'Connessione in corso...');
+
+            try {
+                // Inizializza Firebase
+                if (!firebase.apps.length) {
+                    firebase.initializeApp(config);
+                }
+                
+                database = firebase.database();
+                isFirebaseInitialized = true;
+                
+                // Salva configurazione
+                saveConfig(config);
+                
+                // Nascondi pannello configurazione
+                document.getElementById('firebaseConfig').style.display = 'none';
+                
+                // Inizializza listeners
+                setupDataListeners();
+                
+                updateConnectionStatus('online', 'Connesso - Real-time attivo');
+                showNotification('Database connesso con successo!');
+                
+            } catch (error) {
+                console.error('Errore inizializzazione Firebase:', error);
+                updateConnectionStatus('offline', 'Errore di connessione');
+                showNotification('Errore di connessione: ' + error.message, 'error');
+            }
+            
+            showLoadingOverlay(false);
+        }
+
+        function setupDataListeners() {
+            // Listener per squadre
+            database.ref('teams').on('value', (snapshot) => {
+                const data = snapshot.val();
+                teams = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
+                updateTeamsList();
+                populateTeamSelects();
+                updateClassification();
+                updateStats();
+            });
+
+            // Listener per partite
+            database.ref('matches').on('value', (snapshot) => {
+                const data = snapshot.val();
+                matches = data ? Object.keys(data).map(key => ({id: key, ...data[key]})) : [];
+                updateMatchesList();
+                updateRefereeMatches();
+                updateClassification();
+                updateStats();
+                
+                // Aggiorna form arbitro se necessario
+                const selectedMatch = document.getElementById('refereeMatches').value;
+                if (selectedMatch) {
+                    selectMatchForReferee(selectedMatch);
+                }
+            });
+        }
+
+        function updateConnectionStatus(status, message) {
+            const statusElement = document.getElementById('connectionStatus');
+            const icon = statusElement.querySelector('i');
+            const text = statusElement.querySelector('span');
+            
+            icon.className = `fas fa-circle status-${status} ${status === 'connecting' ? 'pulse' : ''}`;
+            text.textContent = message;
+        }
+
+        function showLoadingOverlay(show) {
+            document.getElementById('loadingOverlay').style.display = show ? 'flex' : 'none';
+        }
+
+        // Gestione dati Firebase
+        function saveToFirebase(path, data) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return Promise.reject('Database non connesso');
+            }
+            
+            return database.ref(path).set(data).catch(error => {
+                console.error('Errore salvataggio Firebase:', error);
+                showNotification('Errore salvataggio: ' + error.message, 'error');
+                throw error;
+            });
+        }
+
+        function pushToFirebase(path, data) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return Promise.reject('Database non connesso');
+            }
+            
+            return database.ref(path).push(data).catch(error => {
+                console.error('Errore salvataggio Firebase:', error);
+                showNotification('Errore salvataggio: ' + error.message, 'error');
+                throw error;
+            });
+        }
+
+        function removeFromFirebase(path) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return Promise.reject('Database non connesso');
+            }
+            
+            return database.ref(path).remove().catch(error => {
+                console.error('Errore rimozione Firebase:', error);
+                showNotification('Errore rimozione: ' + error.message, 'error');
+                throw error;
+            });
+        }
+
+        // Funzioni interfaccia
         function showSection(sectionId, element) {
             document.querySelectorAll('.section').forEach(section => {
                 section.classList.remove('active');
@@ -737,24 +1074,32 @@
             if (sectionId === 'stats') updateStats();
         }
 
+        // Gestione CSV
         function importFromCSV(input) {
             const file = input.files[0];
             if (!file) return;
+
+            if (!isFirebaseInitialized) {
+                showNotification('Connetti prima il database', 'warning');
+                return;
+            }
 
             const reader = new FileReader();
             reader.onload = function(e) {
                 const csv = e.target.result;
                 const lines = csv.split('\n');
+                let importCount = 0;
                 
-                lines.forEach((line, index) => {
-                    if (line.trim() === '') return;
+                showLoadingOverlay(true);
+                
+                const promises = lines.map((line, index) => {
+                    if (line.trim() === '') return Promise.resolve();
                     
                     const data = line.split(',').map(item => item.trim());
                     if (data.length >= 3) {
                         const teamName = data[0];
                         const players = [];
                         
-                        // Parse giocatori: nome, numero, nome, numero, ...
                         for (let i = 1; i < data.length; i += 2) {
                             if (data[i] && data[i + 1]) {
                                 const playerName = data[i];
@@ -771,24 +1116,29 @@
                         if (teamName && players.length > 0) {
                             const existingTeam = teams.find(t => t.name === teamName);
                             if (!existingTeam) {
-                                teams.push({
-                                    id: Date.now() + index,
+                                importCount++;
+                                return pushToFirebase('teams', {
                                     name: teamName,
-                                    players: players
+                                    players: players,
+                                    createdAt: firebase.database.ServerValue.TIMESTAMP
                                 });
                             }
                         }
                     }
+                    return Promise.resolve();
                 });
                 
-                saveData();
-                updateTeamsList();
-                populateTeamSelects();
-                showNotification('Squadre importate con successo!');
+                Promise.all(promises).then(() => {
+                    showLoadingOverlay(false);
+                    showNotification(`${importCount} squadre importate con successo!`);
+                }).catch(() => {
+                    showLoadingOverlay(false);
+                });
             };
             reader.readAsText(file);
         }
 
+        // Gestione giocatori
         function addPlayer() {
             const name = document.getElementById('playerName').value.trim();
             const number = parseInt(document.getElementById('playerNumber').value);
@@ -851,6 +1201,11 @@
                 showNotification('Aggiungi almeno un giocatore', 'error');
                 return;
             }
+
+            if (!isFirebaseInitialized) {
+                showNotification('Connetti prima il database', 'warning');
+                return;
+            }
             
             const existingTeam = teams.find(t => t.name === name);
             if (existingTeam) {
@@ -858,21 +1213,23 @@
                 return;
             }
             
-            teams.push({
-                id: Date.now(),
+            showLoadingOverlay(true);
+            
+            pushToFirebase('teams', {
                 name: name,
-                players: [...currentPlayers]
+                players: [...currentPlayers],
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                // Reset form
+                document.getElementById('teamName').value = '';
+                currentPlayers = [];
+                updateCurrentPlayersList();
+                
+                showLoadingOverlay(false);
+                showNotification('Squadra aggiunta con successo!');
+            }).catch(() => {
+                showLoadingOverlay(false);
             });
-            
-            // Reset form
-            document.getElementById('teamName').value = '';
-            currentPlayers = [];
-            updateCurrentPlayersList();
-            
-            saveData();
-            updateTeamsList();
-            populateTeamSelects();
-            showNotification('Squadra aggiunta con successo!');
         }
 
         function updateTeamsList() {
@@ -889,16 +1246,16 @@
                         <div class="card">
                             <h4>${team.name}</h4>
                             <div class="player-list">
-                                ${team.players.map(player => `
+                                ${team.players ? team.players.map(player => `
                                     <div class="player-item">
                                         <div class="player-info">
                                             <div class="jersey-number">${player.number}</div>
                                             <span>${player.name}</span>
                                         </div>
                                     </div>
-                                `).join('')}
+                                `).join('') : ''}
                             </div>
-                            <button class="btn btn-danger btn-small" style="margin-top: 15px;" onclick="deleteTeam(${team.id})">
+                            <button class="btn btn-danger btn-small" style="margin-top: 15px;" onclick="deleteTeam('${team.id}')">
                                 <i class="fas fa-trash"></i> Elimina
                             </button>
                         </div>
@@ -919,8 +1276,8 @@
         }
 
         function createMatch() {
-            const homeTeamId = parseInt(document.getElementById('homeTeam').value);
-            const awayTeamId = parseInt(document.getElementById('awayTeam').value);
+            const homeTeamId = document.getElementById('homeTeam').value;
+            const awayTeamId = document.getElementById('awayTeam').value;
             const referee = document.getElementById('referee').value.trim();
             
             if (!homeTeamId || !awayTeamId || !referee) {
@@ -932,9 +1289,15 @@
                 showNotification('Le squadre devono essere diverse', 'error');
                 return;
             }
+
+            if (!isFirebaseInitialized) {
+                showNotification('Connetti prima il database', 'warning');
+                return;
+            }
             
-            const match = {
-                id: Date.now(),
+            showLoadingOverlay(true);
+            
+            pushToFirebase('matches', {
                 homeTeamId: homeTeamId,
                 awayTeamId: awayTeamId,
                 referee: referee,
@@ -945,19 +1308,18 @@
                 mvpHome: null,
                 mvpAway: null,
                 startTime: null,
-                endTime: null
-            };
-            
-            matches.push(match);
-            
-            document.getElementById('homeTeam').value = '';
-            document.getElementById('awayTeam').value = '';
-            document.getElementById('referee').value = '';
-            
-            saveData();
-            updateMatchesList();
-            updateRefereeMatches();
-            showNotification('Partita creata con successo!');
+                endTime: null,
+                createdAt: firebase.database.ServerValue.TIMESTAMP
+            }).then(() => {
+                document.getElementById('homeTeam').value = '';
+                document.getElementById('awayTeam').value = '';
+                document.getElementById('referee').value = '';
+                
+                showLoadingOverlay(false);
+                showNotification('Partita creata con successo!');
+            }).catch(() => {
+                showLoadingOverlay(false);
+            });
         }
 
         function updateMatchesList() {
@@ -985,12 +1347,12 @@
                                 <div class="score-display">
                                     <div class="team-score">
                                         <div class="team-name">${homeTeam?.name || 'N/A'}</div>
-                                        <div class="score">${match.homeScore}</div>
+                                        <div class="score">${match.homeScore || 0}</div>
                                     </div>
                                     <div class="vs">VS</div>
                                     <div class="team-score">
                                         <div class="team-name">${awayTeam?.name || 'N/A'}</div>
-                                        <div class="score">${match.awayScore}</div>
+                                        <div class="score">${match.awayScore || 0}</div>
                                     </div>
                                 </div>
                                 <p><strong>Arbitro:</strong> ${match.referee}</p>
@@ -1002,7 +1364,7 @@
                                         ${match.mvpAway ? `${awayTeam?.name}: ${match.mvpAway}` : ''}
                                     </div>
                                 ` : ''}
-                                <button class="btn btn-danger btn-small" style="margin-top: 15px;" onclick="deleteMatch(${match.id})">
+                                <button class="btn btn-danger btn-small" style="margin-top: 15px;" onclick="deleteMatch('${match.id}')">
                                     <i class="fas fa-trash"></i> Elimina
                                 </button>
                             </div>
@@ -1032,9 +1394,16 @@
                 return;
             }
             
-            const match = matches.find(m => m.id === parseInt(matchId));
+            const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+            
             const homeTeam = teams.find(t => t.id === match.homeTeamId);
             const awayTeam = teams.find(t => t.id === match.awayTeamId);
+            
+            if (!homeTeam || !awayTeam) {
+                showNotification('Squadre non trovate per questa partita', 'error');
+                return;
+            }
             
             container.style.display = 'block';
             container.innerHTML = `
@@ -1044,21 +1413,23 @@
                     <div class="score-display">
                         <div class="team-score">
                             <div class="team-name">${homeTeam.name}</div>
-                            <input type="number" id="homeScore" value="${match.homeScore}" min="0" 
-                                   style="width: 80px; text-align: center; font-size: 1.5rem; font-weight: bold;">
+                            <input type="number" id="homeScore" value="${match.homeScore || 0}" min="0" 
+                                   style="width: 80px; text-align: center; font-size: 1.5rem; font-weight: bold;"
+                                   onchange="quickSave('${matchId}')">
                         </div>
                         <div class="vs">VS</div>
                         <div class="team-score">
                             <div class="team-name">${awayTeam.name}</div>
-                            <input type="number" id="awayScore" value="${match.awayScore}" min="0" 
-                                   style="width: 80px; text-align: center; font-size: 1.5rem; font-weight: bold;">
+                            <input type="number" id="awayScore" value="${match.awayScore || 0}" min="0" 
+                                   style="width: 80px; text-align: center; font-size: 1.5rem; font-weight: bold;"
+                                   onchange="quickSave('${matchId}')">
                         </div>
                     </div>
                     
                     <div class="teams-stats">
                         <div class="team-stats">
                             <h4><i class="fas fa-home"></i> ${homeTeam.name}</h4>
-                            ${homeTeam.players.map(player => `
+                            ${(homeTeam.players || []).map(player => `
                                 <div class="player-stats-form">
                                     <div class="player-stats-header">
                                         <div class="jersey-number">${player.number}</div>
@@ -1068,23 +1439,23 @@
                                         <div class="stat-input">
                                             <label>Gol</label>
                                             <input type="number" id="goals_home_${player.number}" 
-                                                   value="${match.playerStats[`home_${player.number}`]?.goals || 0}" min="0"
-                                                   onchange="quickSave(${match.id})">
+                                                   value="${match.playerStats?.[`home_${player.number}`]?.goals || 0}" min="0"
+                                                   onchange="quickSave('${matchId}')">
                                         </div>
                                         <div class="stat-input">
                                             <label>Scalpi</label>
                                             <input type="number" id="scalps_home_${player.number}" 
-                                                   value="${match.playerStats[`home_${player.number}`]?.scalps || 0}" min="0"
-                                                   onchange="quickSave(${match.id})">
+                                                   value="${match.playerStats?.[`home_${player.number}`]?.scalps || 0}" min="0"
+                                                   onchange="quickSave('${matchId}')">
                                         </div>
                                     </div>
                                 </div>
                             `).join('')}
                             <div class="form-group" style="margin-top: 20px;">
                                 <label>MVP ${homeTeam.name}</label>
-                                <select id="mvpHome" onchange="quickSave(${match.id})">
+                                <select id="mvpHome" onchange="quickSave('${matchId}')">
                                     <option value="">Seleziona MVP</option>
-                                    ${homeTeam.players.map(player => 
+                                    ${(homeTeam.players || []).map(player => 
                                         `<option value="${player.name}" ${match.mvpHome === player.name ? 'selected' : ''}>${player.name} #${player.number}</option>`
                                     ).join('')}
                                 </select>
@@ -1093,7 +1464,7 @@
                         
                         <div class="team-stats">
                             <h4><i class="fas fa-plane"></i> ${awayTeam.name}</h4>
-                            ${awayTeam.players.map(player => `
+                            ${(awayTeam.players || []).map(player => `
                                 <div class="player-stats-form">
                                     <div class="player-stats-header">
                                         <div class="jersey-number">${player.number}</div>
@@ -1103,23 +1474,23 @@
                                         <div class="stat-input">
                                             <label>Gol</label>
                                             <input type="number" id="goals_away_${player.number}" 
-                                                   value="${match.playerStats[`away_${player.number}`]?.goals || 0}" min="0"
-                                                   onchange="quickSave(${match.id})">
+                                                   value="${match.playerStats?.[`away_${player.number}`]?.goals || 0}" min="0"
+                                                   onchange="quickSave('${matchId}')">
                                         </div>
                                         <div class="stat-input">
                                             <label>Scalpi</label>
                                             <input type="number" id="scalps_away_${player.number}" 
-                                                   value="${match.playerStats[`away_${player.number}`]?.scalps || 0}" min="0"
-                                                   onchange="quickSave(${match.id})">
+                                                   value="${match.playerStats?.[`away_${player.number}`]?.scalps || 0}" min="0"
+                                                   onchange="quickSave('${matchId}')">
                                         </div>
                                     </div>
                                 </div>
                             `).join('')}
                             <div class="form-group" style="margin-top: 20px;">
                                 <label>MVP ${awayTeam.name}</label>
-                                <select id="mvpAway" onchange="quickSave(${match.id})">
+                                <select id="mvpAway" onchange="quickSave('${matchId}')">
                                     <option value="">Seleziona MVP</option>
-                                    ${awayTeam.players.map(player => 
+                                    ${(awayTeam.players || []).map(player => 
                                         `<option value="${player.name}" ${match.mvpAway === player.name ? 'selected' : ''}>${player.name} #${player.number}</option>`
                                     ).join('')}
                                 </select>
@@ -1128,13 +1499,13 @@
                     </div>
                     
                     <div class="match-controls">
-                        <button class="btn btn-success" onclick="startMatch(${match.id})" ${match.status === 'playing' ? 'style="display:none;"' : ''}>
+                        <button class="btn btn-success" onclick="startMatch('${matchId}')" ${match.status === 'playing' ? 'style="display:none;"' : ''}>
                             <i class="fas fa-play"></i> Inizia
                         </button>
-                        <button class="btn" onclick="saveMatchData(${match.id})">
+                        <button class="btn" onclick="saveMatchData('${matchId}')">
                             <i class="fas fa-save"></i> Salva
                         </button>
-                        <button class="btn btn-danger" onclick="endMatch(${match.id})" ${match.status !== 'playing' ? 'style="display:none;"' : ''}>
+                        <button class="btn btn-danger" onclick="endMatch('${matchId}')" ${match.status !== 'playing' ? 'style="display:none;"' : ''}>
                             <i class="fas fa-stop"></i> Termina
                         </button>
                     </div>
@@ -1142,72 +1513,128 @@
             `;
         }
 
+        let saveTimeout;
         function quickSave(matchId) {
-            setTimeout(() => saveMatchData(matchId), 500);
+            clearTimeout(saveTimeout);
+            saveTimeout = setTimeout(() => saveMatchData(matchId), 1000);
         }
 
         function startMatch(matchId) {
-            const match = matches.find(m => m.id === matchId);
-            match.status = 'playing';
-            match.startTime = new Date().toISOString();
-            
-            saveData();
-            updateMatchesList();
-            updateRefereeMatches();
-            showNotification('Partita iniziata!');
-            
-            selectMatchForReferee(matchId);
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return;
+            }
+
+            const updates = {
+                status: 'playing',
+                startTime: firebase.database.ServerValue.TIMESTAMP
+            };
+
+            saveToFirebase(`matches/${matchId}`, {...matches.find(m => m.id === matchId), ...updates})
+                .then(() => {
+                    showNotification('Partita iniziata!');
+                });
         }
 
         function saveMatchData(matchId) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return;
+            }
+
             const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+
             const homeTeam = teams.find(t => t.id === match.homeTeamId);
             const awayTeam = teams.find(t => t.id === match.awayTeamId);
             
-            match.homeScore = parseInt(document.getElementById('homeScore').value) || 0;
-            match.awayScore = parseInt(document.getElementById('awayScore').value) || 0;
-            
-            match.mvpHome = document.getElementById('mvpHome').value || null;
-            match.mvpAway = document.getElementById('mvpAway').value || null;
-            
-            match.playerStats = {};
-            
-            homeTeam.players.forEach(player => {
-                const goals = parseInt(document.getElementById(`goals_home_${player.number}`).value) || 0;
-                const scalps = parseInt(document.getElementById(`scalps_home_${player.number}`).value) || 0;
-                match.playerStats[`home_${player.number}`] = { goals, scalps };
-            });
-            
-            awayTeam.players.forEach(player => {
-                const goals = parseInt(document.getElementById(`goals_away_${player.number}`).value) || 0;
-                const scalps = parseInt(document.getElementById(`scalps_away_${player.number}`).value) || 0;
-                match.playerStats[`away_${player.number}`] = { goals, scalps };
-            });
-            
-            saveData();
-            updateMatchesList();
-            showNotification('Dati salvati!');
+            const homeScoreInput = document.getElementById('homeScore');
+            const awayScoreInput = document.getElementById('awayScore');
+            const mvpHomeSelect = document.getElementById('mvpHome');
+            const mvpAwaySelect = document.getElementById('mvpAway');
+
+            if (!homeScoreInput || !awayScoreInput) return;
+
+            const updatedMatch = {
+                ...match,
+                homeScore: parseInt(homeScoreInput.value) || 0,
+                awayScore: parseInt(awayScoreInput.value) || 0,
+                mvpHome: mvpHomeSelect?.value || null,
+                mvpAway: mvpAwaySelect?.value || null,
+                playerStats: {}
+            };
+
+            // Salva statistiche giocatori
+            if (homeTeam?.players) {
+                homeTeam.players.forEach(player => {
+                    const goalsInput = document.getElementById(`goals_home_${player.number}`);
+                    const scalpsInput = document.getElementById(`scalps_home_${player.number}`);
+                    
+                    if (goalsInput && scalpsInput) {
+                        updatedMatch.playerStats[`home_${player.number}`] = {
+                            goals: parseInt(goalsInput.value) || 0,
+                            scalps: parseInt(scalpsInput.value) || 0
+                        };
+                    }
+                });
+            }
+
+            if (awayTeam?.players) {
+                awayTeam.players.forEach(player => {
+                    const goalsInput = document.getElementById(`goals_away_${player.number}`);
+                    const scalpsInput = document.getElementById(`scalps_away_${player.number}`);
+                    
+                    if (goalsInput && scalpsInput) {
+                        updatedMatch.playerStats[`away_${player.number}`] = {
+                            goals: parseInt(goalsInput.value) || 0,
+                            scalps: parseInt(scalpsInput.value) || 0
+                        };
+                    }
+                });
+            }
+
+            saveToFirebase(`matches/${matchId}`, updatedMatch)
+                .then(() => {
+                    // Feedback visivo silenzioso per auto-save
+                    const statusIcon = document.querySelector('#connectionStatus i');
+                    const originalClass = statusIcon.className;
+                    statusIcon.className = 'fas fa-check status-online';
+                    setTimeout(() => {
+                        statusIcon.className = originalClass;
+                    }, 1000);
+                });
         }
 
         function endMatch(matchId) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return;
+            }
+
             const match = matches.find(m => m.id === matchId);
-            match.status = 'finished';
-            match.endTime = new Date().toISOString();
-            
+            if (!match) return;
+
+            // Prima salva i dati, poi termina
             saveMatchData(matchId);
-            
-            updateMatchesList();
-            updateRefereeMatches();
-            updateClassification();
-            updateStats();
-            showNotification('Partita terminata!');
-            
-            document.getElementById('matchRefereeForm').style.display = 'none';
-            document.getElementById('refereeMatches').value = '';
+
+            setTimeout(() => {
+                const updatedMatch = {
+                    ...matches.find(m => m.id === matchId),
+                    status: 'finished',
+                    endTime: firebase.database.ServerValue.TIMESTAMP
+                };
+
+                saveToFirebase(`matches/${matchId}`, updatedMatch)
+                    .then(() => {
+                        document.getElementById('matchRefereeForm').style.display = 'none';
+                        document.getElementById('refereeMatches').value = '';
+                        showNotification('Partita terminata!');
+                    });
+            }, 500);
         }
 
         function calculateClassification() {
-            const classification = teams.map(team => {
+            return teams.map(team => {
                 let points = 0;
                 let played = 0;
                 let won = 0;
@@ -1226,47 +1653,51 @@
                         played++;
                         
                         if (isHome) {
-                            goalsFor += match.homeScore;
-                            goalsAgainst += match.awayScore;
+                            goalsFor += match.homeScore || 0;
+                            goalsAgainst += match.awayScore || 0;
                             
-                            if (match.homeScore > match.awayScore) {
+                            if ((match.homeScore || 0) > (match.awayScore || 0)) {
                                 won++;
                                 points += 3;
-                            } else if (match.homeScore === match.awayScore) {
+                            } else if ((match.homeScore || 0) === (match.awayScore || 0)) {
                                 drawn++;
                                 points += 1;
                             } else {
                                 lost++;
                             }
                             
-                            team.players.forEach(player => {
-                                const stats = match.playerStats[`home_${player.number}`];
-                                if (stats) {
-                                    totalGoals += stats.goals;
-                                    totalScalps += stats.scalps;
-                                }
-                            });
+                            if (team.players) {
+                                team.players.forEach(player => {
+                                    const stats = match.playerStats?.[`home_${player.number}`];
+                                    if (stats) {
+                                        totalGoals += stats.goals || 0;
+                                        totalScalps += stats.scalps || 0;
+                                    }
+                                });
+                            }
                         } else {
-                            goalsFor += match.awayScore;
-                            goalsAgainst += match.homeScore;
+                            goalsFor += match.awayScore || 0;
+                            goalsAgainst += match.homeScore || 0;
                             
-                            if (match.awayScore > match.homeScore) {
+                            if ((match.awayScore || 0) > (match.homeScore || 0)) {
                                 won++;
                                 points += 3;
-                            } else if (match.awayScore === match.homeScore) {
+                            } else if ((match.awayScore || 0) === (match.homeScore || 0)) {
                                 drawn++;
                                 points += 1;
                             } else {
                                 lost++;
                             }
                             
-                            team.players.forEach(player => {
-                                const stats = match.playerStats[`away_${player.number}`];
-                                if (stats) {
-                                    totalGoals += stats.goals;
-                                    totalScalps += stats.scalps;
-                                }
-                            });
+                            if (team.players) {
+                                team.players.forEach(player => {
+                                    const stats = match.playerStats?.[`away_${player.number}`];
+                                    if (stats) {
+                                        totalGoals += stats.goals || 0;
+                                        totalScalps += stats.scalps || 0;
+                                    }
+                                });
+                            }
                         }
                     }
                 });
@@ -1284,9 +1715,7 @@
                     totalGoals,
                     totalScalps
                 };
-            });
-            
-            return classification.sort((a, b) => {
+            }).sort((a, b) => {
                 if (b.points !== a.points) return b.points - a.points;
                 if (b.goalDifference !== a.goalDifference) return b.goalDifference - a.goalDifference;
                 return b.goalsFor - a.goalsFor;
@@ -1345,27 +1774,29 @@
             let playerStats = {};
             
             finishedMatches.forEach(match => {
-                Object.entries(match.playerStats || {}).forEach(([key, stats]) => {
-                    totalGoals += stats.goals;
-                    totalScalps += stats.scalps;
-                    
-                    const playerNumber = key.replace(/^(home_|away_)/, '');
-                    const team = teams.find(t => 
-                        t.players.some(p => p.number == playerNumber)
-                    );
-                    
-                    if (team) {
-                        const player = team.players.find(p => p.number == playerNumber);
-                        if (player) {
-                            const playerKey = `${player.name} (${team.name})`;
-                            if (!playerStats[playerKey]) {
-                                playerStats[playerKey] = { goals: 0, scalps: 0 };
+                if (match.playerStats) {
+                    Object.entries(match.playerStats).forEach(([key, stats]) => {
+                        totalGoals += stats.goals || 0;
+                        totalScalps += stats.scalps || 0;
+                        
+                        const playerNumber = key.replace(/^(home_|away_)/, '');
+                        const team = teams.find(t => 
+                            t.players?.some(p => p.number == playerNumber)
+                        );
+                        
+                        if (team) {
+                            const player = team.players.find(p => p.number == playerNumber);
+                            if (player) {
+                                const playerKey = `${player.name} (${team.name})`;
+                                if (!playerStats[playerKey]) {
+                                    playerStats[playerKey] = { goals: 0, scalps: 0 };
+                                }
+                                playerStats[playerKey].goals += stats.goals || 0;
+                                playerStats[playerKey].scalps += stats.scalps || 0;
                             }
-                            playerStats[playerKey].goals += stats.goals;
-                            playerStats[playerKey].scalps += stats.scalps;
                         }
-                    }
-                });
+                    });
+                }
             });
             
             document.getElementById('totalTeams').textContent = teams.length;
@@ -1399,37 +1830,48 @@
         }
 
         function deleteTeam(teamId) {
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return;
+            }
+
             if (confirm('Sei sicuro di voler eliminare questa squadra? Verranno eliminate anche tutte le sue partite.')) {
-                teams = teams.filter(t => t.id !== teamId);
-                matches = matches.filter(m => m.homeTeamId !== teamId && m.awayTeamId !== teamId);
+                showLoadingOverlay(true);
                 
-                saveData();
-                updateTeamsList();
-                updateMatchesList();
-                updateRefereeMatches();
-                updateClassification();
-                updateStats();
-                populateTeamSelects();
-                showNotification('Squadra eliminata');
+                // Elimina le partite associate
+                const teamMatches = matches.filter(m => m.homeTeamId === teamId || m.awayTeamId === teamId);
+                const deletePromises = teamMatches.map(match => 
+                    removeFromFirebase(`matches/${match.id}`)
+                );
+                
+                // Elimina la squadra
+                deletePromises.push(removeFromFirebase(`teams/${teamId}`));
+                
+                Promise.all(deletePromises).then(() => {
+                    showLoadingOverlay(false);
+                    showNotification('Squadra eliminata');
+                }).catch(() => {
+                    showLoadingOverlay(false);
+                });
             }
         }
 
         function deleteMatch(matchId) {
-            if (confirm('Sei sicuro di voler eliminare questa partita?')) {
-                matches = matches.filter(m => m.id !== matchId);
-                
-                saveData();
-                updateMatchesList();
-                updateRefereeMatches();
-                updateClassification();
-                updateStats();
-                showNotification('Partita eliminata');
+            if (!isFirebaseInitialized) {
+                showNotification('Database non connesso', 'error');
+                return;
             }
-        }
 
-        function saveData() {
-            localStorage.setItem('pallascout_teams', JSON.stringify(teams));
-            localStorage.setItem('pallascout_matches', JSON.stringify(matches));
+            if (confirm('Sei sicuro di voler eliminare questa partita?')) {
+                showLoadingOverlay(true);
+                
+                removeFromFirebase(`matches/${matchId}`).then(() => {
+                    showLoadingOverlay(false);
+                    showNotification('Partita eliminata');
+                }).catch(() => {
+                    showLoadingOverlay(false);
+                });
+            }
         }
 
         function showNotification(message, type = 'success') {
@@ -1442,6 +1884,45 @@
                 notification.classList.remove('show');
             }, 3000);
         }
+
+        // Gestione offline/online
+        window.addEventListener('online', () => {
+            if (isFirebaseInitialized) {
+                updateConnectionStatus('online', 'Connesso - Real-time attivo');
+                showNotification('Connessione ripristinata');
+            }
+        });
+
+        window.addEventListener('offline', () => {
+            updateConnectionStatus('offline', 'Offline - Dati non sincronizzati');
+            showNotification('Connessione persa', 'warning');
+        });
+
+        // Utility per esportare configurazione (debug)
+        function exportConfig() {
+            const config = {
+                teams: teams,
+                matches: matches,
+                timestamp: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(config, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `torneo_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+
+        // Cleanup al caricamento pagina
+        window.addEventListener('beforeunload', () => {
+            if (database && dataListeners.length > 0) {
+                dataListeners.forEach(listener => {
+                    database.ref(listener.path).off('value', listener.callback);
+                });
+            }
+        });
     </script>
 </body>
 </html>
