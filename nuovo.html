@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+//<!DOCTYPE html>
 <html lang="it">
 <head>
     <meta charset="UTF-8">
@@ -741,52 +741,288 @@
             </div>
         </div>
 
-        <!-- Configurazione Firebase -->
-        <div id="firebaseConfig" class="firebase-config">
-            <h3><i class="fas fa-cog"></i> Configurazione Database</h3>
-            <p>Per utilizzare l'app con sincronizzazione real-time, inserisci la configurazione Firebase:</p>
+        <!-- Configurazione Google Apps Script -->
+        <div id="appsScriptConfig" class="firebase-config">
+            <h3><i class="fas fa-cog"></i> Configurazione Database Google Sheets</h3>
+            <p>Utilizziamo Google Sheets + Apps Script come database gratuito e real-time!</p>
             
-            <div class="config-form">
-                <div class="form-group">
-                    <label>API Key</label>
-                    <input type="text" id="apiKey" placeholder="AIzaSy...">
-                </div>
-                <div class="form-group">
-                    <label>Auth Domain</label>
-                    <input type="text" id="authDomain" placeholder="your-project.firebaseapp.com">
-                </div>
-                <div class="form-group">
-                    <label>Database URL</label>
-                    <input type="text" id="databaseURL" placeholder="https://your-project.firebaseio.com">
-                </div>
-                <div class="form-group">
-                    <label>Project ID</label>
-                    <input type="text" id="projectId" placeholder="your-project-id">
-                </div>
+            <div class="form-group">
+                <label>URL Google Apps Script</label>
+                <input type="text" id="appsScriptUrl" placeholder="https://script.google.com/macros/s/.../exec">
             </div>
             
-            <button class="btn" onclick="initializeFirebase()">
-                <i class="fas fa-rocket"></i> Inizializza Database
+            <button class="btn" onclick="testAppsScriptConnection()">
+                <i class="fas fa-rocket"></i> Testa Connessione
             </button>
             
             <details style="margin-top: 20px;">
-                <summary style="cursor: pointer; font-weight: bold;">🔧 Come configurare Firebase (clicca per aprire)</summary>
-                <div style="margin-top: 15px; line-height: 1.6;">
-                    <h4>1. Crea progetto Firebase:</h4>
-                    <p>• Vai su <strong>console.firebase.google.com</strong></p>
-                    <p>• Clicca "Crea un progetto"</p>
-                    <p>• Scegli un nome (es. "torneo-pallascout")</p>
+                <summary style="cursor: pointer; font-weight: bold; color: var(--primary);">🔧 Setup Google Apps Script (clicca per aprire)</summary>
+                <div style="margin-top: 15px; line-height: 1.8; background: var(--light); padding: 20px; border-radius: 8px;">
+                    <h4 style="color: var(--primary);">1. Crea nuovo Google Sheet:</h4>
+                    <p>• Vai su <strong>sheets.google.com</strong></p>
+                    <p>• Crea un nuovo foglio chiamato "Database Torneo"</p>
+                    <p>• Rinomina il primo foglio in "teams" e aggiungi un secondo foglio "matches"</p>
                     
-                    <h4>2. Configura Realtime Database:</h4>
-                    <p>• Nel menu laterale: "Realtime Database"</p>
-                    <p>• Clicca "Crea database"</p>
-                    <p>• Scegli modalità "Test" per iniziare</p>
+                    <h4 style="color: var(--primary);">2. Apri Apps Script:</h4>
+                    <p>• Nel foglio: <strong>Estensioni → Apps Script</strong></p>
+                    <p>• Elimina tutto il codice esistente</p>
+                    <p>• Copia e incolla il codice che ti fornirò sotto</p>
                     
-                    <h4>3. Ottieni configurazione:</h4>
-                    <p>• Vai in "Impostazioni progetto" (icona ingranaggio)</p>
-                    <p>• Scorri fino a "Le tue app"</p>
-                    <p>• Clicca "Aggiungi app" → "Web" (icona &lt;/&gt;)</p>
-                    <p>• Copia i valori da firebaseConfig</p>
+                    <h4 style="color: var(--primary);">3. Deploy Apps Script:</h4>
+                    <p>• <strong>Deploy → Nuova distribuzione</strong></p>
+                    <p>• Tipo: <strong>"App web"</strong></p>
+                    <p>• Esegui come: <strong>"Me"</strong></p>
+                    <p>• Accesso: <strong>"Chiunque"</strong></p>
+                    <p>• Clicca <strong>"Distribuisci"</strong></p>
+                    <p>• <strong>Copia l'URL</strong> e incollalo qui sopra</p>
+                    
+                    <div style="background: white; padding: 15px; border-radius: 6px; margin: 15px 0; border-left: 4px solid var(--success);">
+                        <h4 style="color: var(--success); margin-bottom: 10px;">📄 Codice Google Apps Script:</h4>
+                        <textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 12px; background: #f8f9fa; border: 1px solid var(--border); padding: 10px;" onclick="this.select()">// ============================================
+// TORNEO PALLASCOUT - Google Apps Script Database
+// ============================================
+
+function doGet(e) {
+  try {
+    const action = e.parameter.action;
+    
+    switch(action) {
+      case 'getTeams':
+        return ContentService.createTextOutput(JSON.stringify(getTeams()))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'getMatches':
+        return ContentService.createTextOutput(JSON.stringify(getMatches()))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'getAllData':
+        return ContentService.createTextOutput(JSON.stringify({
+          teams: getTeams(),
+          matches: getMatches()
+        })).setMimeType(ContentService.MimeType.JSON);
+      
+      default:
+        return ContentService.createTextOutput(JSON.stringify({error: 'Action not found'}))
+                             .setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()}))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const action = data.action;
+    
+    switch(action) {
+      case 'addTeam':
+        return ContentService.createTextOutput(JSON.stringify(addTeam(data.team)))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'addMatch':
+        return ContentService.createTextOutput(JSON.stringify(addMatch(data.match)))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'updateMatch':
+        return ContentService.createTextOutput(JSON.stringify(updateMatch(data.matchId, data.match)))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'deleteTeam':
+        return ContentService.createTextOutput(JSON.stringify(deleteTeam(data.teamId)))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      case 'deleteMatch':
+        return ContentService.createTextOutput(JSON.stringify(deleteMatch(data.matchId)))
+                             .setMimeType(ContentService.MimeType.JSON);
+      
+      default:
+        return ContentService.createTextOutput(JSON.stringify({error: 'Action not found'}))
+                             .setMimeType(ContentService.MimeType.JSON);
+    }
+  } catch (error) {
+    return ContentService.createTextOutput(JSON.stringify({error: error.toString()}))
+                         .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+// ============================================
+// FUNZIONI TEAMS
+// ============================================
+
+function getTeams() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('teams');
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return []; // Solo header o vuoto
+  
+  const teams = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) { // Se c'è un ID
+      teams.push({
+        id: data[i][0],
+        name: data[i][1],
+        players: JSON.parse(data[i][2] || '[]'),
+        createdAt: data[i][3]
+      });
+    }
+  }
+  return teams;
+}
+
+function addTeam(team) {
+  const sheet = getOrCreateSheet('teams', ['ID', 'Nome', 'Giocatori', 'Creato']);
+  const teamId = Utilities.getUuid();
+  
+  sheet.appendRow([
+    teamId,
+    team.name,
+    JSON.stringify(team.players),
+    new Date()
+  ]);
+  
+  return {success: true, id: teamId};
+}
+
+function deleteTeam(teamId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('teams');
+  if (!sheet) return {success: false, error: 'Sheet not found'};
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === teamId) {
+      sheet.deleteRow(i + 1);
+      return {success: true};
+    }
+  }
+  return {success: false, error: 'Team not found'};
+}
+
+// ============================================
+// FUNZIONI MATCHES
+// ============================================
+
+function getMatches() {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('matches');
+  if (!sheet) return [];
+  
+  const data = sheet.getDataRange().getValues();
+  if (data.length <= 1) return []; // Solo header o vuoto
+  
+  const matches = [];
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0]) { // Se c'è un ID
+      matches.push({
+        id: data[i][0],
+        homeTeamId: data[i][1],
+        awayTeamId: data[i][2],
+        referee: data[i][3],
+        status: data[i][4] || 'pending',
+        homeScore: parseInt(data[i][5]) || 0,
+        awayScore: parseInt(data[i][6]) || 0,
+        playerStats: JSON.parse(data[i][7] || '{}'),
+        mvpHome: data[i][8] || null,
+        mvpAway: data[i][9] || null,
+        startTime: data[i][10] || null,
+        endTime: data[i][11] || null,
+        createdAt: data[i][12]
+      });
+    }
+  }
+  return matches;
+}
+
+function addMatch(match) {
+  const sheet = getOrCreateSheet('matches', [
+    'ID', 'Home Team ID', 'Away Team ID', 'Referee', 'Status', 
+    'Home Score', 'Away Score', 'Player Stats', 'MVP Home', 'MVP Away',
+    'Start Time', 'End Time', 'Created'
+  ]);
+  
+  const matchId = Utilities.getUuid();
+  
+  sheet.appendRow([
+    matchId,
+    match.homeTeamId,
+    match.awayTeamId,
+    match.referee,
+    match.status || 'pending',
+    match.homeScore || 0,
+    match.awayScore || 0,
+    JSON.stringify(match.playerStats || {}),
+    match.mvpHome || '',
+    match.mvpAway || '',
+    match.startTime || '',
+    match.endTime || '',
+    new Date()
+  ]);
+  
+  return {success: true, id: matchId};
+}
+
+function updateMatch(matchId, matchData) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('matches');
+  if (!sheet) return {success: false, error: 'Sheet not found'};
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === matchId) {
+      // Aggiorna la riga
+      sheet.getRange(i + 1, 1, 1, 13).setValues([[
+        matchId,
+        matchData.homeTeamId,
+        matchData.awayTeamId,
+        matchData.referee,
+        matchData.status,
+        matchData.homeScore || 0,
+        matchData.awayScore || 0,
+        JSON.stringify(matchData.playerStats || {}),
+        matchData.mvpHome || '',
+        matchData.mvpAway || '',
+        matchData.startTime || '',
+        matchData.endTime || '',
+        data[i][12] // Mantieni data creazione originale
+      ]]);
+      return {success: true};
+    }
+  }
+  return {success: false, error: 'Match not found'};
+}
+
+function deleteMatch(matchId) {
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('matches');
+  if (!sheet) return {success: false, error: 'Sheet not found'};
+  
+  const data = sheet.getDataRange().getValues();
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][0] === matchId) {
+      sheet.deleteRow(i + 1);
+      return {success: true};
+    }
+  }
+  return {success: false, error: 'Match not found'};
+}
+
+// ============================================
+// UTILITY FUNCTIONS
+// ============================================
+
+function getOrCreateSheet(name, headers) {
+  let sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName(name);
+  if (!sheet) {
+    sheet = SpreadsheetApp.getActiveSpreadsheet().insertSheet(name);
+    if (headers) {
+      sheet.getRange(1, 1, 1, headers.length).setValues([headers]);
+      sheet.getRange(1, 1, 1, headers.length).setFontWeight('bold');
+      sheet.setFrozenRows(1);
+    }
+  }
+  return sheet;
+}</textarea>
+                        <small style="color: var(--gray); display: block; margin-top: 8px;">📝 Clicca nel box sopra per selezionare tutto il codice, poi copialo</small>
+                    </div>
                 </div>
             </details>
         </div>
@@ -985,9 +1221,23 @@
         let dataListeners = [];
 
         // Inizializzazione
+        // Inizializzazione
         document.addEventListener('DOMContentLoaded', function() {
-            // Carica configurazione salvata
-            loadSavedConfig();
+            // Verifica che Firebase sia caricato
+            const checkFirebase = () => {
+                if (typeof firebase !== 'undefined') {
+                    updateConnectionStatus('offline', 'Firebase caricato - In attesa configurazione');
+                    
+                    // Carica configurazione salvata
+                    loadSavedConfig();
+                } else {
+                    updateConnectionStatus('offline', 'Errore: Firebase non caricato');
+                    showNotification('Errore nel caricamento di Firebase. Ricarica la pagina.', 'error');
+                }
+            };
+            
+            // Controlla Firebase dopo un breve delay
+            setTimeout(checkFirebase, 1000);
             
             // Inizializza interfaccia
             updateTeamsList();
@@ -1017,9 +1267,11 @@
                 document.getElementById('databaseURL').value = config.databaseURL || '';
                 document.getElementById('projectId').value = config.projectId || '';
                 
-                // Auto-inizializza se configurazione completa
-                if (config.apiKey && config.authDomain && config.databaseURL && config.projectId) {
-                    initializeFirebase();
+                // Auto-inizializza se configurazione completa e Firebase caricato
+                if (config.apiKey && config.authDomain && config.databaseURL && config.projectId && typeof firebase !== 'undefined') {
+                    setTimeout(() => {
+                        initializeFirebase();
+                    }, 500);
                 }
             }
         }
@@ -1044,37 +1296,52 @@
                 return;
             }
 
+            // Verifica che Firebase sia caricato
+            if (typeof firebase === 'undefined') {
+                showNotification('Firebase non caricato. Ricarica la pagina e riprova.', 'error');
+                return;
+            }
+
             showLoadingOverlay(true);
             updateConnectionStatus('connecting', 'Connessione in corso...');
 
             try {
-                // Inizializza Firebase
-                if (!firebase.apps.length) {
+                // Inizializza Firebase se non già fatto
+                if (!firebase.apps || firebase.apps.length === 0) {
                     firebase.initializeApp(config);
                 }
                 
                 database = firebase.database();
-                isFirebaseInitialized = true;
                 
-                // Salva configurazione
-                saveConfig(config);
-                
-                // Nascondi pannello configurazione
-                document.getElementById('firebaseConfig').style.display = 'none';
-                
-                // Inizializza listeners
-                setupDataListeners();
-                
-                updateConnectionStatus('online', 'Connesso - Real-time attivo');
-                showNotification('Database connesso con successo!');
+                // Test connessione
+                database.ref('.info/connected').on('value', function(snapshot) {
+                    if (snapshot.val() === true) {
+                        isFirebaseInitialized = true;
+                        
+                        // Salva configurazione
+                        saveConfig(config);
+                        
+                        // Nascondi pannello configurazione
+                        document.getElementById('firebaseConfig').style.display = 'none';
+                        
+                        // Inizializza listeners
+                        setupDataListeners();
+                        
+                        updateConnectionStatus('online', 'Connesso - Real-time attivo');
+                        showNotification('Database connesso con successo!');
+                        showLoadingOverlay(false);
+                    } else {
+                        updateConnectionStatus('offline', 'Disconnesso');
+                        showLoadingOverlay(false);
+                    }
+                });
                 
             } catch (error) {
                 console.error('Errore inizializzazione Firebase:', error);
                 updateConnectionStatus('offline', 'Errore di connessione');
                 showNotification('Errore di connessione: ' + error.message, 'error');
+                showLoadingOverlay(false);
             }
-            
-            showLoadingOverlay(false);
         }
 
         function setupDataListeners() {
