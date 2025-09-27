@@ -1,319 +1,4 @@
-function updateMatchStatusSummary() {
-            const summary = document.getElementById('matchStatusSummary');
-            if (!summary) return;
-            
-            const completed = matches.filter(m => m.status === 'completed').length;
-            const inProgress = matches.filter(m => m.status === 'in_progress').length;
-            const scheduled = matches.filter(m => m.status === 'scheduled').length;
-            
-            summary.innerHTML = `
-                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
-                    <div style="padding: 15px; background: #d4edda; border-radius: 8px;">
-                        <h4>${completed}</h4>
-                        <p>Completate</p>
-                    </div>
-                    <div style="padding: 15px; background: #fff3cd; border-radius: 8px;">
-                        <h4>${inProgress}</h4>
-                        <p>In Corso</p>
-                    </div>
-                    <div style="padding: 15px; background: #f8d7da; border-radius: 8px;">
-                        <h4>${scheduled}</h4>
-                        <p>Programmate</p>
-                    </div>
-                    <div style="padding: 15px; background: #cce5ff; border-radius: 8px;">
-                        <h4>${matches.length}</h4>
-                        <p>Totali</p>
-                    </div>
-                </div>
-            `;
-        }
 
-        function showDetailedMatchStatus() {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-            
-            let content = `
-                <div class="modal-content">
-                    <span class="close" onclick="this.remove()">&times;</span>
-                    <h3>📋 Stato Dettagliato Partite</h3>
-                    <div style="max-height: 400px; overflow-y: auto;">
-            `;
-            
-            matches.forEach(match => {
-                const homeTeam = teams.find(t => t.id === match.homeTeamId);
-                const awayTeam = teams.find(t => t.id === match.awayTeamId);
-                const statusEmoji = match.status === 'completed' ? '✅' : match.status === 'in_progress' ? '⏳' : '📅';
-                
-                content += `
-                    <div style="padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px; display: flex; justify-content: space-between;">
-                        <span>${statusEmoji} ${homeTeam.name} vs ${awayTeam.name} - ${match.field}</span>
-                        <span>${match.homeScore || 0} - ${match.awayScore || 0}</span>
-                    </div>
-                `;
-            });
-            
-            content += `
-                    </div>
-                </div>
-            `;
-            
-            modal.innerHTML = content;
-            document.body.appendChild(modal);
-        }
-
-        function exportCompleteJSON() {
-            const completeData = {
-                tournament: {
-                    name: "Torneo Pallascout",
-                    created: new Date().toISOString(),
-                    version: "1.0"
-                },
-                teams: teams,
-                matches: matches,
-                statistics: generateCompleteStatistics(),
-                exportDate: new Date().toISOString()
-            };
-            
-            const blob = new Blob([JSON.stringify(completeData, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `torneo_pallascout_completo_${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function exportExcelFormat() {
-            let csv = "CLASSIFICA\\n";
-            csv += "Posizione,Squadra,Partite,Vittorie,Pareggi,Sconfitte,Gol Fatti,Gol Subiti,Differenza Reti,Punti\\n";
-            
-            const sortedTeams = [...teams].sort((a, b) => {
-                if (b.stats.points !== a.stats.points) {
-                    return b.stats.points - a.stats.points;
-                }
-                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
-            });
-
-            sortedTeams.forEach((team, index) => {
-                const goalDiff = team.stats.goalsFor - team.stats.goalsAgainst;
-                csv += `${index + 1},${team.name},${team.stats.matches},${team.stats.wins},${team.stats.draws},${team.stats.losses},${team.stats.goalsFor},${team.stats.goalsAgainst},${goalDiff},${team.stats.points}\\n`;
-            });
-
-            csv += "\\n\\nSTATISTICHE GIOCATORI\\n";
-            csv += "Giocatore,Numero,Squadra,Gol,Scalpi,MVP\\n";
-            
-            teams.forEach(team => {
-                team.players.forEach(player => {
-                    csv += `${player.name},${player.number},${team.name},${player.stats.goals},${player.stats.scalps},${player.stats.mvp}\\n`;
-                });
-            });
-
-            csv += "\\n\\nRISULTATI PARTITE\\n";
-            csv += "Data,Campo,Squadra Casa,Squadra Ospite,Risultato,Stato\\n";
-            
-            matches.forEach(match => {
-                const homeTeam = teams.find(t => t.id === match.homeTeamId);
-                const awayTeam = teams.find(t => t.id === match.awayTeamId);
-                const date = match.completedAt ? new Date(match.completedAt).toLocaleDateString('it-IT') : 'N/D';
-                csv += `${date},${match.field},${homeTeam.name},${awayTeam.name},${match.homeScore}-${match.awayScore},${match.status}\\n`;
-            });
-
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `torneo_pallascout_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function exportPrintableReport() {
-            const report = generatePrintableReport();
-            const blob = new Blob([report], { type: 'text/plain' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `report_torneo_pallascout_${new Date().toISOString().split('T')[0]}.txt`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function exportWebPage() {
-            const htmlContent = generateResultsWebPage();
-            const blob = new Blob([htmlContent], { type: 'text/html' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `risultati_torneo_${new Date().toISOString().split('T')[0]}.html`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        function generateCompleteStatistics() {
-            const allPlayers = [];
-            teams.forEach(team => {
-                team.players.forEach(player => {
-                    allPlayers.push({
-                        ...player,
-                        teamName: team.name
-                    });
-                });
-            });
-
-            return {
-                teams: {
-                    total: teams.length,
-                    totalPlayers: allPlayers.length
-                },
-                matches: {
-                    total: matches.length,
-                    completed: matches.filter(m => m.status === 'completed').length,
-                    inProgress: matches.filter(m => m.status === 'in_progress').length,
-                    scheduled: matches.filter(m => m.status === 'scheduled').length
-                },
-                goals: {
-                    total: allPlayers.reduce((sum, p) => sum + p.stats.goals, 0),
-                    topScorer: allPlayers.reduce((max, p) => p.stats.goals > max.stats.goals ? p : max, allPlayers[0] || {stats: {goals: 0}})
-                },
-                scalps: {
-                    total: allPlayers.reduce((sum, p) => sum + p.stats.scalps, 0),
-                    topScalper: allPlayers.reduce((max, p) => p.stats.scalps > max.stats.scalps ? p : max, allPlayers[0] || {stats: {scalps: 0}})
-                },
-                mvp: {
-                    total: allPlayers.reduce((sum, p) => sum + p.stats.mvp, 0),
-                    topMVP: allPlayers.reduce((max, p) => p.stats.mvp > max.stats.mvp ? p : max, allPlayers[0] || {stats: {mvp: 0}})
-                }
-            };
-        }
-
-        function generatePrintableReport() {
-            let report = `🏆 TORNEO PALLASCOUT - REPORT FINALE 🏆\n`;
-            report += `═══════════════════════════════════════════════════════════════\n`;
-            report += `📅 Generato il: ${new Date().toLocaleString('it-IT')}\n\n`;
-
-            // Classifica
-            report += `📊 CLASSIFICA FINALE\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            
-            const sortedTeams = [...teams].sort((a, b) => {
-                if (b.stats.points !== a.stats.points) {
-                    return b.stats.points - a.stats.points;
-                }
-                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
-            });
-
-            sortedTeams.forEach((team, index) => {
-                const goalDiff = team.stats.goalsFor - team.stats.goalsAgainst;
-                const diffStr = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
-                report += `${(index + 1).toString().padStart(2)}° ${team.name.padEnd(20)} | ${team.stats.matches.toString().padStart(2)}G ${team.stats.wins.toString().padStart(2)}V ${team.stats.draws.toString().padStart(2)}P ${team.stats.losses.toString().padStart(2)}S | ${team.stats.goalsFor.toString().padStart(2)}-${team.stats.goalsAgainst.toString().padStart(2)} (${diffStr.padStart(3)}) | ${team.stats.points.toString().padStart(3)} pts\n`;
-            });
-
-            // Statistiche giocatori
-            const allPlayers = [];
-            teams.forEach(team => {
-                team.players.forEach(player => {
-                    allPlayers.push({
-                        ...player,
-                        teamName: team.name
-                    });
-                });
-            });
-
-            const topScorers = [...allPlayers]
-                .filter(p => p.stats.goals > 0)
-                .sort((a, b) => b.stats.goals - a.stats.goals)
-                .slice(0, 10);
-
-            const topScalpers = [...allPlayers]
-                .filter(p => p.stats.scalps > 0)
-                .sort((a, b) => b.stats.scalps - a.stats.scalps)
-                .slice(0, 10);
-
-            const topMVPs = [...allPlayers]
-                .filter(p => p.stats.mvp > 0)
-                .sort((a, b) => b.stats.mvp - a.stats.mvp)
-                .slice(0, 10);
-
-            report += `\n🥅 TOP MARCATORI\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            topScorers.forEach((player, index) => {
-                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.goals} gol\n`;
-            });
-
-            report += `\n⚔️ TOP SCALPERS\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            topScalpers.forEach((player, index) => {
-                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.scalps} scalpi\n`;
-            });
-
-            report += `\n🏆 TOP MVP\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            topMVPs.forEach((player, index) => {
-                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.mvp} MVP\n`;
-            });
-
-            // Risultati partite
-            const completedMatches = matches.filter(m => m.status === 'completed');
-            report += `\n📋 RISULTATI PARTITE (${completedMatches.length}/${matches.length})\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            
-            completedMatches.forEach(match => {
-                const homeTeam = teams.find(t => t.id === match.homeTeamId);
-                const awayTeam = teams.find(t => t.id === match.awayTeamId);
-                const date = new Date(match.completedAt).toLocaleDateString('it-IT');
-                report += `${date} | ${match.field.padEnd(10)} | ${homeTeam.name.padEnd(15)} ${match.homeScore}-${match.awayScore} ${awayTeam.name.padEnd(15)}\n`;
-            });
-
-            // Statistiche generali
-            report += `\n📈 STATISTICHE GENERALI\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            report += `Squadre partecipanti: ${teams.length}\n`;
-            report += `Giocatori registrati: ${allPlayers.length}\n`;
-            report += `Partite programmate: ${matches.length}\n`;
-            report += `Partite completate: ${completedMatches.length}\n`;
-            report += `Gol totali: ${allPlayers.reduce((sum, p) => sum + p.stats.goals, 0)}\n`;
-            report += `Scalpi totali: ${allPlayers.reduce((sum, p) => sum + p.stats.scalps, 0)}\n`;
-            report += `Media gol per partita: ${completedMatches.length > 0 ? (allPlayers.reduce((sum, p) => sum + p.stats.goals, 0) / completedMatches.length).toFixed(1) : 0}\n`;
-
-            report += `\n═══════════════════════════════════════════════════════════════\n`;
-            report += `Report generato da: Torneo Pallascout App\n`;
-
-            return report;
-        }
-
-        function generateResultsWebPage() {
-            const sortedTeams = [...teams].sort((a, b) => {
-                if (b.stats.points !== a.stats.points) {
-                    return b.stats.points - a.stats.points;
-                }
-                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
-            });
-
-            const allPlayers = [];
-            teams.forEach(team => {
-                team.players.forEach(player => {
-                    allPlayers.push({
-                        ...player,
-                        teamName: team.name
-                    });
-                });
-            });
-
-            const topScorers = [...allPlayers]
-                .filter(p => p.stats.goals > 0)
-                .sort((a, b) => b.stats.goals - a.stats.goals)
-                .slice(0, 10);
-
-            return `
 <!DOCTYPE html>
 <html lang="it">
 <head>
@@ -392,141 +77,7 @@ function updateMatchStatusSummary() {
     </div>
 </body>
 </html>`;
-        }
 
-        function validateData() {
-            let issues = [];
-            
-            // Controlla squadre senza giocatori
-            teams.forEach(team => {
-                if (team.players.length === 0) {
-                    issues.push(`Squadra "${team.name}" non ha giocatori`);
-                }
-                
-                // Controlla numeri maglia duplicati
-                const numbers = team.players.map(p => p.number);
-                const duplicates = numbers.filter((n, i) => numbers.indexOf(n) !== i);
-                if (duplicates.length > 0) {
-                    issues.push(`Squadra "${team.name}" ha numeri maglia duplicati: ${[...new Set(duplicates)].join(', ')}`);
-                }
-            });
-            
-            // Controlla partite incomplete
-            matches.forEach(match => {
-                const homeTeam = teams.find(t => t.id === match.homeTeamId);
-                const awayTeam = teams.find(t => t.id === match.awayTeamId);
-                
-                if (!homeTeam || !awayTeam) {
-                    issues.push(`Partita ID ${match.id}: squadra non trovata`);
-                }
-                
-                if (match.status === 'completed' && (!match.completedAt || !match.playerStats)) {
-                    issues.push(`Partita ${homeTeam?.name || 'N/D'} vs ${awayTeam?.name || 'N/D'}: dati incompleti`);
-                }
-            });
-            
-            if (issues.length === 0) {
-                alert('✅ Validazione completata: nessun problema trovato!');
-            } else {
-                alert(`❌ Trovati ${issues.length} problemi:\\n\\n${issues.join('\\n')}`);
-            }
-        }
-
-        function showDataStatistics() {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-            
-            const allPlayers = [];
-            teams.forEach(team => {
-                team.players.forEach(player => {
-                    allPlayers.push({
-                        ...player,
-                        teamName: team.name
-                    });
-                });
-            });
-
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close" onclick="this.remove()">&times;</span>
-                    <h3>📈 Statistiche Database</h3>
-                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${teams.length}</h4>
-                            <p>Squadre</p>
-                        </div>
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${allPlayers.length}</h4>
-                            <p>Giocatori</p>
-                        </div>
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${matches.length}</h4>
-                            <p>Partite Totali</p>
-                        </div>
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${matches.filter(m => m.status === 'completed').length}</h4>
-                            <p>Partite Completate</p>
-                        </div>
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${allPlayers.reduce((sum, p) => sum + p.stats.goals, 0)}</h4>
-                            <p>Gol Totali</p>
-                        </div>
-                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                            <h4>${(localStorage.getItem('pallascout_teams')?.length + localStorage.getItem('pallascout_matches')?.length || 0)} bytes</h4>
-                            <p>Dimensione Dati</p>
-                        </div>
-                    </div>
-                    
-                    <div style="margin-top: 20px;">
-                        <h4>Distribuzione per Squadra:</h4>
-                        ${teams.map(team => `
-                            <div style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">
-                                <strong>${team.name}</strong>: ${team.players.length} giocatori, ${team.stats.matches} partite
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>
-            `;
-            
-            document.body.appendChild(modal);
-        }
-
-        function backupData() {
-            const backupData = {
-                timestamp: new Date().toISOString(),
-                teams: teams,
-                matches: matches,
-                version: "1.0",
-                type: "backup"
-            };
-            
-            const blob = new Blob([JSON.stringify(backupData, null, 2)], {type: 'application/json'});
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `backup_pallascout_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            alert('✅ Backup creato e scaricato!');
-        }
-
-        function resetTournament() {
-            const confirmation = prompt('ATTENZIONE! Questa operazione cancellerà TUTTI i dati.\\n\\nScrivi "RESET TORNEO" per confermare:', '');
-            if (confirmation === 'RESET TORNEO') {
-                teams = [];
-                matches = [];
-                localStorage.removeItem('pallascout_teams');
-                localStorage.removeItem('pallascout_matches');
-                alert('🗑️ Torneo resettato completamente!');
-                displayTeams();
-                updateMatchStatusSummary();
-            } else {
-                alert('Reset annullato.');
-            }
         }<!DOCTYPE html>
 <html lang="it">
 <head>
@@ -1208,7 +759,457 @@ function updateMatchStatusSummary() {
             document.getElementById('awayTeam').value = '';
             document.getElementById('matchField').value = '';
         }
+function updateMatchStatusSummary() {
+            const summary = document.getElementById('matchStatusSummary');
+            if (!summary) return;
+            
+            const completed = matches.filter(m => m.status === 'completed').length;
+            const inProgress = matches.filter(m => m.status === 'in_progress').length;
+            const scheduled = matches.filter(m => m.status === 'scheduled').length;
+            
+            summary.innerHTML = `
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 15px; text-align: center;">
+                    <div style="padding: 15px; background: #d4edda; border-radius: 8px;">
+                        <h4>${completed}</h4>
+                        <p>Completate</p>
+                    </div>
+                    <div style="padding: 15px; background: #fff3cd; border-radius: 8px;">
+                        <h4>${inProgress}</h4>
+                        <p>In Corso</p>
+                    </div>
+                    <div style="padding: 15px; background: #f8d7da; border-radius: 8px;">
+                        <h4>${scheduled}</h4>
+                        <p>Programmate</p>
+                    </div>
+                    <div style="padding: 15px; background: #cce5ff; border-radius: 8px;">
+                        <h4>${matches.length}</h4>
+                        <p>Totali</p>
+                    </div>
+                </div>
+            `;
+        }
 
+        function showDetailedMatchStatus() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            
+            let content = `
+                <div class="modal-content">
+                    <span class="close" onclick="this.remove()">&times;</span>
+                    <h3>📋 Stato Dettagliato Partite</h3>
+                    <div style="max-height: 400px; overflow-y: auto;">
+            `;
+            
+            matches.forEach(match => {
+                const homeTeam = teams.find(t => t.id === match.homeTeamId);
+                const awayTeam = teams.find(t => t.id === match.awayTeamId);
+                const statusEmoji = match.status === 'completed' ? '✅' : match.status === 'in_progress' ? '⏳' : '📅';
+                
+                content += `
+                    <div style="padding: 10px; margin: 5px 0; background: #f8f9fa; border-radius: 5px; display: flex; justify-content: space-between;">
+                        <span>${statusEmoji} ${homeTeam.name} vs ${awayTeam.name} - ${match.field}</span>
+                        <span>${match.homeScore || 0} - ${match.awayScore || 0}</span>
+                    </div>
+                `;
+            });
+            
+            content += `
+                    </div>
+                </div>
+            `;
+            
+            modal.innerHTML = content;
+            document.body.appendChild(modal);
+        }
+
+        function exportCompleteJSON() {
+            const completeData = {
+                tournament: {
+                    name: "Torneo Pallascout",
+                    created: new Date().toISOString(),
+                    version: "1.0"
+                },
+                teams: teams,
+                matches: matches,
+                statistics: generateCompleteStatistics(),
+                exportDate: new Date().toISOString()
+            };
+            
+            const blob = new Blob([JSON.stringify(completeData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `torneo_pallascout_completo_${new Date().toISOString().split('T')[0]}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportExcelFormat() {
+            let csv = "CLASSIFICA\\n";
+            csv += "Posizione,Squadra,Partite,Vittorie,Pareggi,Sconfitte,Gol Fatti,Gol Subiti,Differenza Reti,Punti\\n";
+            
+            const sortedTeams = [...teams].sort((a, b) => {
+                if (b.stats.points !== a.stats.points) {
+                    return b.stats.points - a.stats.points;
+                }
+                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
+            });
+
+            sortedTeams.forEach((team, index) => {
+                const goalDiff = team.stats.goalsFor - team.stats.goalsAgainst;
+                csv += `${index + 1},${team.name},${team.stats.matches},${team.stats.wins},${team.stats.draws},${team.stats.losses},${team.stats.goalsFor},${team.stats.goalsAgainst},${goalDiff},${team.stats.points}\\n`;
+            });
+
+            csv += "\\n\\nSTATISTICHE GIOCATORI\\n";
+            csv += "Giocatore,Numero,Squadra,Gol,Scalpi,MVP\\n";
+            
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    csv += `${player.name},${player.number},${team.name},${player.stats.goals},${player.stats.scalps},${player.stats.mvp}\\n`;
+                });
+            });
+
+            csv += "\\n\\nRISULTATI PARTITE\\n";
+            csv += "Data,Campo,Squadra Casa,Squadra Ospite,Risultato,Stato\\n";
+            
+            matches.forEach(match => {
+                const homeTeam = teams.find(t => t.id === match.homeTeamId);
+                const awayTeam = teams.find(t => t.id === match.awayTeamId);
+                const date = match.completedAt ? new Date(match.completedAt).toLocaleDateString('it-IT') : 'N/D';
+                csv += `${date},${match.field},${homeTeam.name},${awayTeam.name},${match.homeScore}-${match.awayScore},${match.status}\\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `torneo_pallascout_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportPrintableReport() {
+            const report = generatePrintableReport();
+            const blob = new Blob([report], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `report_torneo_pallascout_${new Date().toISOString().split('T')[0]}.txt`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function exportWebPage() {
+            const htmlContent = generateResultsWebPage();
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `risultati_torneo_${new Date().toISOString().split('T')[0]}.html`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        function generateCompleteStatistics() {
+            const allPlayers = [];
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    allPlayers.push({
+                        ...player,
+                        teamName: team.name
+                    });
+                });
+            });
+
+            return {
+                teams: {
+                    total: teams.length,
+                    totalPlayers: allPlayers.length
+                },
+                matches: {
+                    total: matches.length,
+                    completed: matches.filter(m => m.status === 'completed').length,
+                    inProgress: matches.filter(m => m.status === 'in_progress').length,
+                    scheduled: matches.filter(m => m.status === 'scheduled').length
+                },
+                goals: {
+                    total: allPlayers.reduce((sum, p) => sum + p.stats.goals, 0),
+                    topScorer: allPlayers.reduce((max, p) => p.stats.goals > max.stats.goals ? p : max, allPlayers[0] || {stats: {goals: 0}})
+                },
+                scalps: {
+                    total: allPlayers.reduce((sum, p) => sum + p.stats.scalps, 0),
+                    topScalper: allPlayers.reduce((max, p) => p.stats.scalps > max.stats.scalps ? p : max, allPlayers[0] || {stats: {scalps: 0}})
+                },
+                mvp: {
+                    total: allPlayers.reduce((sum, p) => sum + p.stats.mvp, 0),
+                    topMVP: allPlayers.reduce((max, p) => p.stats.mvp > max.stats.mvp ? p : max, allPlayers[0] || {stats: {mvp: 0}})
+                }
+            };
+        }
+
+        function generatePrintableReport() {
+            let report = `🏆 TORNEO PALLASCOUT - REPORT FINALE 🏆\n`;
+            report += `═══════════════════════════════════════════════════════════════\n`;
+            report += `📅 Generato il: ${new Date().toLocaleString('it-IT')}\n\n`;
+
+            // Classifica
+            report += `📊 CLASSIFICA FINALE\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            
+            const sortedTeams = [...teams].sort((a, b) => {
+                if (b.stats.points !== a.stats.points) {
+                    return b.stats.points - a.stats.points;
+                }
+                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
+            });
+
+            sortedTeams.forEach((team, index) => {
+                const goalDiff = team.stats.goalsFor - team.stats.goalsAgainst;
+                const diffStr = goalDiff > 0 ? `+${goalDiff}` : goalDiff.toString();
+                report += `${(index + 1).toString().padStart(2)}° ${team.name.padEnd(20)} | ${team.stats.matches.toString().padStart(2)}G ${team.stats.wins.toString().padStart(2)}V ${team.stats.draws.toString().padStart(2)}P ${team.stats.losses.toString().padStart(2)}S | ${team.stats.goalsFor.toString().padStart(2)}-${team.stats.goalsAgainst.toString().padStart(2)} (${diffStr.padStart(3)}) | ${team.stats.points.toString().padStart(3)} pts\n`;
+            });
+
+            // Statistiche giocatori
+            const allPlayers = [];
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    allPlayers.push({
+                        ...player,
+                        teamName: team.name
+                    });
+                });
+            });
+
+            const topScorers = [...allPlayers]
+                .filter(p => p.stats.goals > 0)
+                .sort((a, b) => b.stats.goals - a.stats.goals)
+                .slice(0, 10);
+
+            const topScalpers = [...allPlayers]
+                .filter(p => p.stats.scalps > 0)
+                .sort((a, b) => b.stats.scalps - a.stats.scalps)
+                .slice(0, 10);
+
+            const topMVPs = [...allPlayers]
+                .filter(p => p.stats.mvp > 0)
+                .sort((a, b) => b.stats.mvp - a.stats.mvp)
+                .slice(0, 10);
+
+            report += `\n🥅 TOP MARCATORI\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            topScorers.forEach((player, index) => {
+                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.goals} gol\n`;
+            });
+
+            report += `\n⚔️ TOP SCALPERS\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            topScalpers.forEach((player, index) => {
+                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.scalps} scalpi\n`;
+            });
+
+            report += `\n🏆 TOP MVP\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            topMVPs.forEach((player, index) => {
+                report += `${(index + 1).toString().padStart(2)}° #${player.number.toString().padStart(2)} ${player.name.padEnd(20)} (${player.teamName.padEnd(15)}) - ${player.stats.mvp} MVP\n`;
+            });
+
+            // Risultati partite
+            const completedMatches = matches.filter(m => m.status === 'completed');
+            report += `\n📋 RISULTATI PARTITE (${completedMatches.length}/${matches.length})\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            
+            completedMatches.forEach(match => {
+                const homeTeam = teams.find(t => t.id === match.homeTeamId);
+                const awayTeam = teams.find(t => t.id === match.awayTeamId);
+                const date = new Date(match.completedAt).toLocaleDateString('it-IT');
+                report += `${date} | ${match.field.padEnd(10)} | ${homeTeam.name.padEnd(15)} ${match.homeScore}-${match.awayScore} ${awayTeam.name.padEnd(15)}\n`;
+            });
+
+            // Statistiche generali
+            report += `\n📈 STATISTICHE GENERALI\n`;
+            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
+            report += `Squadre partecipanti: ${teams.length}\n`;
+            report += `Giocatori registrati: ${allPlayers.length}\n`;
+            report += `Partite programmate: ${matches.length}\n`;
+            report += `Partite completate: ${completedMatches.length}\n`;
+            report += `Gol totali: ${allPlayers.reduce((sum, p) => sum + p.stats.goals, 0)}\n`;
+            report += `Scalpi totali: ${allPlayers.reduce((sum, p) => sum + p.stats.scalps, 0)}\n`;
+            report += `Media gol per partita: ${completedMatches.length > 0 ? (allPlayers.reduce((sum, p) => sum + p.stats.goals, 0) / completedMatches.length).toFixed(1) : 0}\n`;
+
+            report += `\n═══════════════════════════════════════════════════════════════\n`;
+            report += `Report generato da: Torneo Pallascout App\n`;
+
+            return report;
+        }
+
+        function generateResultsWebPage() {
+            const sortedTeams = [...teams].sort((a, b) => {
+                if (b.stats.points !== a.stats.points) {
+                    return b.stats.points - a.stats.points;
+                }
+                return (b.stats.goalsFor - b.stats.goalsAgainst) - (a.stats.goalsFor - a.stats.goalsAgainst);
+            });
+
+            const allPlayers = [];
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    allPlayers.push({
+                        ...player,
+                        teamName: team.name
+                    });
+                });
+            });
+
+            const topScorers = [...allPlayers]
+                .filter(p => p.stats.goals > 0)
+                .sort((a, b) => b.stats.goals - a.stats.goals)
+                .slice(0, 10);
+
+            return `       
+}
+
+        function validateData() {
+            let issues = [];
+            
+            // Controlla squadre senza giocatori
+            teams.forEach(team => {
+                if (team.players.length === 0) {
+                    issues.push(`Squadra "${team.name}" non ha giocatori`);
+                }
+                
+                // Controlla numeri maglia duplicati
+                const numbers = team.players.map(p => p.number);
+                const duplicates = numbers.filter((n, i) => numbers.indexOf(n) !== i);
+                if (duplicates.length > 0) {
+                    issues.push(`Squadra "${team.name}" ha numeri maglia duplicati: ${[...new Set(duplicates)].join(', ')}`);
+                }
+            });
+            
+            // Controlla partite incomplete
+            matches.forEach(match => {
+                const homeTeam = teams.find(t => t.id === match.homeTeamId);
+                const awayTeam = teams.find(t => t.id === match.awayTeamId);
+                
+                if (!homeTeam || !awayTeam) {
+                    issues.push(`Partita ID ${match.id}: squadra non trovata`);
+                }
+                
+                if (match.status === 'completed' && (!match.completedAt || !match.playerStats)) {
+                    issues.push(`Partita ${homeTeam?.name || 'N/D'} vs ${awayTeam?.name || 'N/D'}: dati incompleti`);
+                }
+            });
+            
+            if (issues.length === 0) {
+                alert('✅ Validazione completata: nessun problema trovato!');
+            } else {
+                alert(`❌ Trovati ${issues.length} problemi:\\n\\n${issues.join('\\n')}`);
+            }
+        }
+
+        function showDataStatistics() {
+            const modal = document.createElement('div');
+            modal.className = 'modal';
+            modal.style.display = 'block';
+            
+            const allPlayers = [];
+            teams.forEach(team => {
+                team.players.forEach(player => {
+                    allPlayers.push({
+                        ...player,
+                        teamName: team.name
+                    });
+                });
+            });
+
+            modal.innerHTML = `
+                <div class="modal-content">
+                    <span class="close" onclick="this.remove()">&times;</span>
+                    <h3>📈 Statistiche Database</h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${teams.length}</h4>
+                            <p>Squadre</p>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${allPlayers.length}</h4>
+                            <p>Giocatori</p>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${matches.length}</h4>
+                            <p>Partite Totali</p>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${matches.filter(m => m.status === 'completed').length}</h4>
+                            <p>Partite Completate</p>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${allPlayers.reduce((sum, p) => sum + p.stats.goals, 0)}</h4>
+                            <p>Gol Totali</p>
+                        </div>
+                        <div style="text-align: center; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                            <h4>${(localStorage.getItem('pallascout_teams')?.length + localStorage.getItem('pallascout_matches')?.length || 0)} bytes</h4>
+                            <p>Dimensione Dati</p>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-top: 20px;">
+                        <h4>Distribuzione per Squadra:</h4>
+                        ${teams.map(team => `
+                            <div style="margin: 5px 0; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                                <strong>${team.name}</strong>: ${team.players.length} giocatori, ${team.stats.matches} partite
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+            
+            document.body.appendChild(modal);
+        }
+
+        function backupData() {
+            const backupData = {
+                timestamp: new Date().toISOString(),
+                teams: teams,
+                matches: matches,
+                version: "1.0",
+                type: "backup"
+            };
+            
+            const blob = new Blob([JSON.stringify(backupData, null, 2)], {type: 'application/json'});
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `backup_pallascout_${new Date().toISOString().replace(/[:.]/g, '-')}.json`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            alert('✅ Backup creato e scaricato!');
+        }
+
+        function resetTournament() {
+            const confirmation = prompt('ATTENZIONE! Questa operazione cancellerà TUTTI i dati.\\n\\nScrivi "RESET TORNEO" per confermare:', '');
+            if (confirmation === 'RESET TORNEO') {
+                teams = [];
+                matches = [];
+                localStorage.removeItem('pallascout_teams');
+                localStorage.removeItem('pallascout_matches');
+                alert('🗑️ Torneo resettato completamente!');
+                displayTeams();
+                updateMatchStatusSummary();
+            } else {
+                alert('Reset annullato.');
+            }
         function displayMatches() {
             const matchesList = document.getElementById('matchesList');
             matchesList.innerHTML = '<div class="match-grid"></div>';
@@ -1268,8 +1269,8 @@ function updateMatchStatusSummary() {
                 saveData();
                 displayMatches();
             }
-        }
-
+     
+   }
         // Gestione arbitro
         function updateRefereeMatchSelect() {
             const select = document.getElementById('RefereeMatchSelect');
