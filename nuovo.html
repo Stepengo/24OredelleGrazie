@@ -13,26 +13,29 @@
         }
 
         :root {
-            --primary: #667eea;
-            --primary-dark: #5a6fd8;
-            --secondary: #764ba2;
-            --success: #10b981;
-            --danger: #ef4444;
-            --warning: #f59e0b;
-            --info: #3b82f6;
-            --light: #f8fafc;
-            --dark: #1e293b;
-            --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-            --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            --primary: #4a90e2;
+            --primary-dark: #357abd;
+            --secondary: #5cb85c;
+            --success: #5cb85c;
+            --danger: #d9534f;
+            --warning: #f0ad4e;
+            --info: #5bc0de;
+            --light: #f8f9fa;
+            --dark: #333;
+            --gray: #6c757d;
+            --border: #dee2e6;
+            --shadow: 0 2px 4px rgba(0,0,0,0.1);
+            --shadow-lg: 0 4px 8px rgba(0,0,0,0.15);
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: linear-gradient(135deg, var(--primary) 0%, var(--secondary) 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #f8f9fa;
             min-height: 100vh;
             color: var(--dark);
-            -webkit-font-smoothing: antialiased;
-            -moz-osx-font-smoothing: grayscale;
+            line-height: 1.6;
+            margin: 0;
+            padding: 0;
         }
 
         .container {
@@ -49,23 +52,25 @@
         }
 
         .header {
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            border-radius: 16px;
+            background: white;
+            border-bottom: 1px solid var(--border);
             padding: 20px;
-            margin-bottom: 20px;
+            margin-bottom: 0;
             text-align: center;
-            box-shadow: var(--shadow-lg);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: var(--shadow);
         }
 
         .header h1 {
             font-size: 1.8rem;
             margin-bottom: 8px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .header p {
+            color: var(--gray);
+            font-size: 0.9rem;
+            margin: 0;
         }
 
         .connection-status {
@@ -74,7 +79,12 @@
             justify-content: center;
             gap: 8px;
             margin-top: 10px;
-            font-size: 0.9rem;
+            font-size: 0.85rem;
+            padding: 8px 16px;
+            border-radius: 20px;
+            background: var(--light);
+            color: var(--gray);
+            display: inline-flex;
         }
 
         .status-online {
@@ -104,13 +114,13 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            border-top: 1px solid rgba(0, 0, 0, 0.1);
-            padding: 10px 0;
+            background: white;
+            border-top: 1px solid var(--border);
+            padding: 8px 0;
             z-index: 1000;
             display: flex;
             justify-content: space-around;
+            box-shadow: 0 -2px 4px rgba(0,0,0,0.1);
         }
 
         .nav-item {
@@ -119,89 +129,110 @@
             align-items: center;
             padding: 8px 12px;
             text-decoration: none;
-            color: #64748b;
+            color: var(--gray);
             font-size: 0.75rem;
-            transition: all 0.3s ease;
-            border-radius: 12px;
+            transition: all 0.2s ease;
+            border-radius: 8px;
             min-width: 60px;
         }
 
         .nav-item.active {
             color: var(--primary);
-            background: rgba(102, 126, 234, 0.1);
+            background: rgba(74, 144, 226, 0.1);
         }
 
         .nav-item i {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
             margin-bottom: 4px;
         }
 
         @media (min-width: 768px) {
             .bottom-nav {
                 position: relative;
-                background: transparent;
-                border: none;
+                background: white;
+                border: 1px solid var(--border);
+                border-radius: 8px;
                 justify-content: center;
-                gap: 10px;
-                margin-bottom: 30px;
-                padding: 0;
+                gap: 8px;
+                margin: 20px auto;
+                padding: 12px;
+                max-width: 600px;
+                box-shadow: var(--shadow);
             }
 
             .nav-item {
-                background: rgba(255, 255, 255, 0.9);
-                padding: 15px 25px;
-                border-radius: 15px;
-                box-shadow: var(--shadow);
-                font-size: 1rem;
+                background: transparent;
+                padding: 12px 20px;
+                border-radius: 6px;
+                font-size: 0.9rem;
                 flex-direction: row;
                 gap: 8px;
                 min-width: auto;
+                border: 1px solid transparent;
+            }
+
+            .nav-item:hover {
+                background: var(--light);
+                border-color: var(--border);
             }
 
             .nav-item.active {
-                background: linear-gradient(45deg, var(--primary), var(--secondary));
+                background: var(--primary);
                 color: white;
+                border-color: var(--primary);
+            }
+
+            .nav-item i {
+                margin-bottom: 0;
             }
         }
 
         .section {
             display: none;
-            background: rgba(255, 255, 255, 0.95);
-            backdrop-filter: blur(15px);
-            border-radius: 16px;
-            padding: 20px;
+            background: white;
+            border-radius: 8px;
+            padding: 24px;
+            margin: 20px auto;
             margin-bottom: 80px;
-            box-shadow: var(--shadow-lg);
-            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 1000px;
+            box-shadow: var(--shadow);
+            border: 1px solid var(--border);
         }
 
         .section.active {
             display: block;
-            animation: fadeInUp 0.4s ease-out;
+            animation: fadeIn 0.3s ease-out;
         }
 
-        @keyframes fadeInUp {
-            from { opacity: 0; transform: translateY(20px); }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
             to { opacity: 1; transform: translateY(0); }
         }
 
         .section h2 {
             color: var(--dark);
-            margin-bottom: 20px;
-            font-size: 1.5rem;
+            margin-bottom: 24px;
+            font-size: 1.4rem;
+            font-weight: 600;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+            border-bottom: 2px solid var(--light);
+            padding-bottom: 12px;
+        }
+
+        .section h2 i {
+            color: var(--primary);
         }
 
         .form-group {
-            margin-bottom: 16px;
+            margin-bottom: 20px;
         }
 
         .form-group label {
             display: block;
-            margin-bottom: 6px;
-            font-weight: 600;
+            margin-bottom: 8px;
+            font-weight: 500;
             color: var(--dark);
             font-size: 0.9rem;
         }
@@ -211,10 +242,10 @@
         .form-group select {
             width: 100%;
             padding: 12px 16px;
-            border: 2px solid #e2e8f0;
-            border-radius: 12px;
-            font-size: 16px;
-            transition: all 0.3s ease;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            transition: all 0.2s ease;
             background: white;
         }
 
@@ -223,7 +254,7 @@
         .form-group select:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+            box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
         }
 
         .btn {
@@ -232,40 +263,46 @@
             justify-content: center;
             gap: 8px;
             padding: 12px 20px;
-            background: linear-gradient(45deg, var(--primary), var(--secondary));
+            background: var(--primary);
             color: white;
             border: none;
-            border-radius: 12px;
-            font-size: 0.95rem;
-            font-weight: 600;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            font-weight: 500;
             cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: var(--shadow);
+            transition: all 0.2s ease;
             text-decoration: none;
-            min-height: 48px;
+            min-height: 44px;
         }
 
         .btn:hover, .btn:active {
-            transform: translateY(-2px);
-            box-shadow: var(--shadow-lg);
+            background: var(--primary-dark);
+            transform: none;
+            box-shadow: var(--shadow);
         }
 
         .btn:disabled {
-            opacity: 0.5;
-            transform: none;
+            opacity: 0.6;
             cursor: not-allowed;
         }
 
         .btn-small {
             padding: 8px 16px;
             font-size: 0.85rem;
-            min-height: 40px;
+            min-height: 36px;
         }
 
-        .btn-success { background: linear-gradient(45deg, var(--success), #059669); }
-        .btn-danger { background: linear-gradient(45deg, var(--danger), #dc2626); }
-        .btn-warning { background: linear-gradient(45deg, var(--warning), #d97706); }
-        .btn-info { background: linear-gradient(45deg, var(--info), #2563eb); }
+        .btn-success { background: var(--success); }
+        .btn-success:hover { background: #449d44; }
+        
+        .btn-danger { background: var(--danger); }
+        .btn-danger:hover { background: #c9302c; }
+        
+        .btn-warning { background: var(--warning); }
+        .btn-warning:hover { background: #ec971f; }
+        
+        .btn-info { background: var(--info); }
+        .btn-info:hover { background: #46b8da; }
 
         .card {
             background: white;
@@ -474,6 +511,60 @@
         .classification-table {
             width: 100%;
             border-collapse: collapse;
+            font-size: 0.9rem;
+            margin-top: 16px;
+        }
+
+        .classification-table thead {
+            background: var(--light);
+            border-bottom: 2px solid var(--border);
+        }
+
+        .classification-table th,
+        .classification-table td {
+            padding: 12px 8px;
+            text-align: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .classification-table th {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .classification-table tbody tr:hover {
+            background: var(--light);
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        @media (min-width: 768px) {
+            .stats-grid { grid-template-columns: repeat(4, 1fr); }
+        }
+
+        .stat-card {
+            background: var(--primary);
+            color: white;
+            padding: 24px;
+            border-radius: 8px;
+            text-align: center;
+            box-shadow: var(--shadow);
+        }
+
+        .stat-number {
+            font-size: 2rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .stat-card:nth-child(2) { background: var(--success); }
+        .stat-card:nth-child(3) { background: var(--warning); }
+        .stat-card:nth-child(4) { background: var(--info); };
             font-size: 0.9rem;
             overflow-x: auto;
             display: block;
@@ -905,6 +996,15 @@
             updateClassification();
             updateStats();
             populateTeamSelects();
+            
+            // Carica URL Google Sheets salvato
+            const savedSheetsUrl = localStorage.getItem('google_sheets_url');
+            if (savedSheetsUrl) {
+                document.getElementById('googleSheetsUrl').value = savedSheetsUrl;
+            }
+            
+            // Aggiungi pulsante refresh se c'è un URL salvato
+            setTimeout(addRefreshButton, 1000);
         });
 
         // Configurazione Firebase
@@ -1074,7 +1174,225 @@
             if (sectionId === 'stats') updateStats();
         }
 
-        // Gestione CSV
+        // Importazione da Google Sheets
+        async function importFromGoogleSheets() {
+            const url = document.getElementById('googleSheetsUrl').value.trim();
+            
+            if (!url) {
+                showNotification('Inserisci l\'URL del Google Sheets', 'error');
+                return;
+            }
+
+            if (!isFirebaseInitialized) {
+                showNotification('Connetti prima il database', 'warning');
+                return;
+            }
+
+            // Converti URL di Google Sheets in formato CSV
+            let csvUrl;
+            try {
+                if (url.includes('/edit')) {
+                    // URL normale di Google Sheets
+                    const sheetId = url.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/)?.[1];
+                    if (!sheetId) {
+                        throw new Error('URL non valido');
+                    }
+                    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                } else if (url.includes('export?format=csv')) {
+                    // URL già in formato CSV
+                    csvUrl = url;
+                } else {
+                    throw new Error('URL non riconosciuto');
+                }
+            } catch (error) {
+                showNotification('URL Google Sheets non valido. Assicurati che sia condiviso pubblicamente.', 'error');
+                return;
+            }
+
+            showLoadingOverlay(true);
+            updateConnectionStatus('connecting', 'Importando da Google Sheets...');
+
+            try {
+                // Usa un proxy CORS per accedere a Google Sheets
+                const proxyUrl = 'https://api.allorigins.win/raw?url=';
+                const response = await fetch(proxyUrl + encodeURIComponent(csvUrl));
+                
+                if (!response.ok) {
+                    throw new Error('Impossibile accedere al foglio. Verifica che sia condiviso pubblicamente.');
+                }
+
+                const csvData = await response.text();
+                
+                if (!csvData || csvData.trim() === '') {
+                    throw new Error('Il foglio è vuoto o non accessibile');
+                }
+
+                await processGoogleSheetsData(csvData);
+                
+                // Salva URL per riuso futuro
+                localStorage.setItem('google_sheets_url', url);
+                
+                updateConnectionStatus('online', 'Connesso - Real-time attivo');
+                showLoadingOverlay(false);
+                
+            } catch (error) {
+                console.error('Errore importazione Google Sheets:', error);
+                showLoadingOverlay(false);
+                updateConnectionStatus('offline', 'Errore importazione');
+                showNotification('Errore: ' + error.message, 'error');
+                
+                // Suggerisci alternative
+                setTimeout(() => {
+                    showNotification('Prova: 1) Verifica che il foglio sia pubblico 2) Usa il caricamento CSV come backup', 'warning');
+                }, 3000);
+            }
+        }
+
+        async function processGoogleSheetsData(csvData) {
+            const lines = csvData.split('\n');
+            let importCount = 0;
+            const errors = [];
+            
+            // Salta la prima riga se contiene intestazioni
+            const dataLines = lines.slice(1).filter(line => line.trim() !== '');
+            
+            if (dataLines.length === 0) {
+                throw new Error('Nessun dato trovato nel foglio');
+            }
+
+            const importPromises = dataLines.map(async (line, index) => {
+                try {
+                    const data = parseCSVLine(line);
+                    
+                    if (data.length >= 3) {
+                        const teamName = data[0]?.trim();
+                        if (!teamName) return;
+                        
+                        const players = [];
+                        
+                        // Parsing giocatori: colonna 1=nome1, colonna 2=maglia1, colonna 3=nome2, colonna 4=maglia2, etc.
+                        for (let i = 1; i < data.length; i += 2) {
+                            const playerName = data[i]?.trim();
+                            const playerNumber = parseInt(data[i + 1]);
+                            
+                            if (playerName && !isNaN(playerNumber)) {
+                                // Controlla duplicati numeri maglia nella stessa squadra
+                                if (players.find(p => p.number === playerNumber)) {
+                                    errors.push(`Squadra "${teamName}": numero maglia ${playerNumber} duplicato`);
+                                    continue;
+                                }
+                                
+                                players.push({
+                                    name: playerName,
+                                    number: playerNumber
+                                });
+                            }
+                        }
+                        
+                        if (players.length > 0) {
+                            // Controlla se squadra esiste già
+                            const existingTeam = teams.find(t => t.name.toLowerCase() === teamName.toLowerCase());
+                            
+                            if (!existingTeam) {
+                                await pushToFirebase('teams', {
+                                    name: teamName,
+                                    players: players,
+                                    importedAt: firebase.database.ServerValue.TIMESTAMP,
+                                    source: 'google_sheets'
+                                });
+                                importCount++;
+                            } else {
+                                errors.push(`Squadra "${teamName}" già esistente (ignorata)`);
+                            }
+                        } else {
+                            errors.push(`Squadra "${teamName}": nessun giocatore valido trovato`);
+                        }
+                    }
+                } catch (error) {
+                    errors.push(`Riga ${index + 2}: ${error.message}`);
+                }
+            });
+
+            await Promise.all(importPromises);
+            
+            // Mostra risultati
+            if (importCount > 0) {
+                showNotification(`✅ ${importCount} squadre importate con successo!`);
+            }
+            
+            if (errors.length > 0) {
+                console.warn('Errori durante importazione:', errors);
+                setTimeout(() => {
+                    showNotification(`⚠️ ${errors.length} errori durante l'importazione (vedi console)`, 'warning');
+                }, 2000);
+            }
+            
+            if (importCount === 0 && errors.length > 0) {
+                throw new Error('Nessuna squadra importata. Controlla il formato del foglio.');
+            }
+        }
+
+        // Parser CSV più robusto per gestire virgole dentro i campi
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current);
+                    current = '';
+                } else {
+                    current += char;
+                }
+            }
+            
+            result.push(current);
+            return result.map(field => field.replace(/^"|"$/g, '').trim());
+        }
+
+        // Auto-ricarica da Google Sheets (funzione bonus)
+        async function refreshFromGoogleSheets() {
+            const savedUrl = localStorage.getItem('google_sheets_url');
+            if (savedUrl) {
+                document.getElementById('googleSheetsUrl').value = savedUrl;
+                showNotification('🔄 Aggiornamento automatico da Google Sheets...', 'info');
+                await importFromGoogleSheets();
+            }
+        }
+
+        // Aggiungi pulsante di refresh nella sezione squadre
+        function addRefreshButton() {
+            const savedUrl = localStorage.getItem('google_sheets_url');
+            if (savedUrl) {
+                const teamsSection = document.getElementById('teams');
+                const refreshButton = `
+                    <div style="text-align: center; margin: 20px 0;">
+                        <button class="btn btn-info btn-small" onclick="refreshFromGoogleSheets()">
+                            <i class="fas fa-sync"></i> Ricarica da Google Sheets
+                        </button>
+                        <small style="display: block; margin-top: 5px; color: #666;">
+                            Ultimo foglio: ${savedUrl.includes('/d/') ? '.../' + savedUrl.split('/d/')[1].split('/')[0] : 'URL salvato'}
+                        </small>
+                    </div>
+                `;
+                
+                // Inserisci dopo il form di importazione
+                const hrElement = teamsSection.querySelector('hr');
+                if (hrElement && !teamsSection.querySelector('.refresh-section')) {
+                    const div = document.createElement('div');
+                    div.className = 'refresh-section';
+                    div.innerHTML = refreshButton;
+                    hrElement.parentNode.insertBefore(div, hrElement);
+                }
+            }
+        }
+
+        // Gestione CSV (mantenuta come backup)
         function importFromCSV(input) {
             const file = input.files[0];
             if (!file) return;
@@ -1087,52 +1405,13 @@
             const reader = new FileReader();
             reader.onload = function(e) {
                 const csv = e.target.result;
-                const lines = csv.split('\n');
-                let importCount = 0;
-                
                 showLoadingOverlay(true);
                 
-                const promises = lines.map((line, index) => {
-                    if (line.trim() === '') return Promise.resolve();
-                    
-                    const data = line.split(',').map(item => item.trim());
-                    if (data.length >= 3) {
-                        const teamName = data[0];
-                        const players = [];
-                        
-                        for (let i = 1; i < data.length; i += 2) {
-                            if (data[i] && data[i + 1]) {
-                                const playerName = data[i];
-                                const playerNumber = parseInt(data[i + 1]);
-                                if (playerName && !isNaN(playerNumber)) {
-                                    players.push({
-                                        name: playerName,
-                                        number: playerNumber
-                                    });
-                                }
-                            }
-                        }
-                        
-                        if (teamName && players.length > 0) {
-                            const existingTeam = teams.find(t => t.name === teamName);
-                            if (!existingTeam) {
-                                importCount++;
-                                return pushToFirebase('teams', {
-                                    name: teamName,
-                                    players: players,
-                                    createdAt: firebase.database.ServerValue.TIMESTAMP
-                                });
-                            }
-                        }
-                    }
-                    return Promise.resolve();
-                });
-                
-                Promise.all(promises).then(() => {
+                processGoogleSheetsData(csv).then(() => {
                     showLoadingOverlay(false);
-                    showNotification(`${importCount} squadre importate con successo!`);
-                }).catch(() => {
+                }).catch(error => {
                     showLoadingOverlay(false);
+                    showNotification('Errore importazione CSV: ' + error.message, 'error');
                 });
             };
             reader.readAsText(file);
