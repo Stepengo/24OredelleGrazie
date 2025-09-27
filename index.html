@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>PallaScout — Gestione Torneo</title>
+
+  <!-- Stili base -->
+  <style>
+    :root{
+      --bg:#f6f7fb;
+      --card:#ffffff;
+      --muted:#6b7280;
+      --accent:#0b5fff;
+      --success:#16a34a;
+      --danger:#ef4444;
+      --glass: rgba(255,255,255,0.6);
+      font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial;
+    }
+    html,body{height:100%;margin:0;background:var(--bg);color:#111}
+    header{background:linear-gradient(90deg,#0b5fff22,#06b6d422);padding:14px 18px;display:flex;align-items:center;gap:12px}
+    header h1{margin:0;font-size:1.05rem}
+    .container{max-width:1200px;margin:18px auto;padding:16px}
+    .grid{display:grid;grid-template-columns: 320px 1fr;gap:16px}
+    .card{background:var(--card);border-radius:12px;padding:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06)}
+    button{background:var(--accent);color:white;border:0;padding:8px 12px;border-radius:8px;cursor:pointer}
+    button.ghost{background:transparent;color:var(--accent);border:1px solid #e6eefc}
+    .muted{color:var(--muted);font-size:0.95rem}
+    ul.list{list-style:none;margin:0;padding:0;max-height:60vh;overflow:auto}
+    ul.list li{padding:8px;border-bottom:1px solid #f1f5f9;display:flex;justify-content:space-between;align-items:center}
+    .team-meta{font-size:0.9rem;color:var(--muted)}
+    .small{font-size:0.85rem}
+    .row{display:flex;gap:8px;align-items:center}
+    .select{padding:6px;border-radius:8px;border:1px solid #e6eefc}
+    .toast{position:fixed;right:18px;bottom:18px;background:#111;color:#fff;padding:10px 14px;border-radius:10px;box-shadow:0 6px 18px rgba(0,0,0,0.12);opacity:0;transform:translateY(10px);transition:all .25s}
+    .toast.show{opacity:1;transform:translateY(0)}
+    footer{padding:12px;text-align:center;color:var(--muted);font-size:0.9rem;margin-top:18px}
+    /* Responsive */
+    @media (max-width:900px){
+      .grid{grid-template-columns:1fr; padding:0 8px}
+      .container{padding:8px}
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden><circle cx="12" cy="12" r="10" stroke="#0b5fff" stroke-width="1.6"/><path d="M7 12h10M12 7v10" stroke="#0b5fff" stroke-width="1.6" stroke-linecap="round"/></svg>
+    <h1>PallaScout — Gestione Torneo</h1>
+    <div style="margin-left:auto" class="muted small">Multi-utente · Online · Google Sheets</div>
+  </header>
+
+  <div class="container">
+    <div class="grid">
+      <!-- Colonna sinistra: controllo rapido / import / filtri -->
+      <aside class="card" id="left-panel">
+        <h3>Import / Config</h3>
+        <p class="muted small">Importa squadre e giocatori da Google Sheets (risultante da Google Form).</p>
+
+        <!-- URL della Web App di Google Apps Script -->
+        <label class="small muted">Google Apps Script WebApp URL</label>
+        <input id="GAS_URL" class="select" type="url" placeholder="https://script.google.com/macros/s/XXXXX/exec" style="width:100%;margin-bottom:8px" />
+
+        <div style="display:flex;gap:8px;margin-bottom:8px">
+          <button id="btnImportTeams">Importa Squadre</button>
+          <button id="btnRefresh" class="ghost">Aggiorna</button>
+        </div>
+
+        <hr style="margin:10px 0"/>
+
+        <h4>Filtri rapidi</h4>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          <select id="filterGroup" class="select">
+            <option value="">Tutti i gruppi</option>
+            <!-- riempito dinamicamente -->
+          </select>
+
+          <input id="searchTeam" class="select" placeholder="Cerca squadra o giocatore..." />
+        </div>
+
+        <hr style="margin:10px 0"/>
+
+        <div>
+          <strong>Stato</strong>
+          <div class="small muted" id="statusLine">Pronto</div>
+        </div>
+
+        <hr style="margin:10px 0"/>
+
+        <div>
+          <strong>Squadre importate</strong>
+          <div id="teamsCount" class="muted small">0</div>
+        </div>
+      </aside>
+
+      <!-- Colonna destra: area principale -->
+      <main>
+        <section class="card" id="teams-card">
+          <h3>Elenco Squadre</h3>
+          <p class="muted small">Clicca su una squadra per vedere i giocatori / assegnare ruoli / edit.</p>
+
+          <ul id="teamsList" class="list" aria-live="polite">
+            <!-- elementi dinamici -->
+          </ul>
+        </section>
+
+        <section class="card" id="matches-card" style="margin-top:12px;">
+          <h3>Partite</h3>
+          <p class="muted small">Lista partite attive / programmate. Gli arbitri possono aprire la partita e inserire i risultati in real-time.</p>
+
+          <div style="display:flex;gap:8px;align-items:center;margin-bottom:8px">
+            <select id="selectRound" class="select">
+              <option value="">Tutti i gironi / round</option>
+            </select>
+            <button id="btnLoadMatches" class="ghost">Carica partite</button>
+            <div style="margin-left:auto" class="small muted" id="liveCount">Partite aperte: 0</div>
+          </div>
+
+          <ul id="matchesList" class="list">
+            <!-- elementi dinamici -->
+          </ul>
+        </section>
+
+        <section class="card" id="live-entry" style="margin-top:12px; display:none;">
+          <h3>Inserimento risultato (Live)</h3>
+          <p class="muted small">Area rapida per arbitri — compilare gol & scalpi per ogni giocatore e selezionare MVP per entrambe le squadre.</p>
+
+          <!-- Qui verranno mostrate le griglie per squadra — riempito via JS nella Parte 2 -->
+          <div id="liveMatchContainer">
+            <!-- placeholder -->
+            <div class="muted small">Nessuna partita aperta.</div>
+          </div>
+
+          <div style="display:flex;gap:8px;margin-top:10px">
+            <button id="btnSaveLive" style="background:var(--success)">Salva risultato</button>
+            <button id="btnCancelLive" class="ghost">Annulla</button>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <footer class="muted small">
+      Progetto: PallaScout · 3 punti vittoria / 1 pareggio / 0 sconfitta · Creato per caricamento su GitHub Pages + Apps Script
+    </footer>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast">Messaggio</div>
+
+  <!-- Script iniziali: definizioni, utilità e caricamento liste di base -->
+  <script>
+    /***********************
+     * CONFIG
+     ***********************/
+    // L'URL deve essere impostato dall'utente nel campo input (web app di Google Apps Script)
+    // L'Apps Script dovrebbe offrire endpoint tipo:
+    // ?action=getTeams  -> ritorna {teams: [...], players: [...]}
+    // ?action=getMatches -> ritorna {matches: [...]}
+    // ?action=saveMatch -> POST con payload JSON
+    // (Nel codice qui sotto usiamo query param action per chiarezza; nella Parte 2/3 mostrerò esempi di payload)
+    const DOM = {
+      GAS_URL: document.getElementById('GAS_URL'),
+      btnImportTeams: document.getElementById('btnImportTeams'),
+      btnRefresh: document.getElementById('btnRefresh'),
+      teamsList: document.getElementById('teamsList'),
+      teamsCount: document.getElementById('teamsCount'),
+      statusLine: document.getElementById('statusLine'),
+      toast: document.getElementById('toast'),
+      filterGroup: document.getElementById('filterGroup'),
+      searchTeam: document.getElementById('searchTeam'),
+      btnLoadMatches: document.getElementById('btnLoadMatches'),
+      matchesList: document.getElementById('matchesList'),
+      selectRound: document.getElementById('selectRound'),
+      liveEntry: document.getElementById('live-entry'),
+      liveMatchContainer: document.getElementById('liveMatchContainer'),
+      btnSaveLive: document.getElementById('btnSaveLive'),
+      btnCancelLive: document.getElementById('btnCancelLive'),
+      liveCount: document.getElementById('liveCount')
+    };
+
+    // Stato locale (popolato all'import)
+    let STATE = {
+      teams: [],       // [{id,name,group,players:[{name,number,id}],...}]
+      playersMap: {},  // mapping playerId -> player
+      matches: [],     // lista di partite
+      currentMatch: null
+    };
+
+    /***********************
+     * UTILITIES
+     ***********************/
+    function showToast(msg, timeout=2500){
+      const t = DOM.toast;
+      t.textContent = msg;
+      t.classList.add('show');
+      setTimeout(()=> t.classList.remove('show'), timeout);
+    }
+
+    async function fetchJSON(url, opts = {}){
+      try {
+        const res = await fetch(url, opts);
+        if(!res.ok) throw new Error('Errore rete: ' + res.status);
+        return await res.json();
+      } catch (err){
+        throw err;
+      }
+    }
+
+    function setStatus(txt){
+      DOM.statusLine.textContent = txt;
+    }
+
+    /***********************
+     * RENDER: Teams
+     ***********************/
+    function renderTeamsList(filterText = ''){
+      const ul = DOM.teamsList;
+      ul.innerHTML = '';
+      const q = filterText.trim().toLowerCase();
+
+      const list = STATE.teams
+        // filtro semplice su nome squadra o giocatore
+        .filter(team => {
+          if(!q) return true;
+          if(team.name.toLowerCase().includes(q)) return true;
+          // cerca nei giocatori
+          return team.players.some(p => (p.name || '').toLowerCase().includes(q) || String(p.number || '').includes(q));
+        })
+        .sort((a,b)=> a.name.localeCompare(b.name));
+
+      for(const team of list){
+        const li = document.createElement('li');
+        const left = document.createElement('div');
+        left.style.display='flex';
+        left.style.flexDirection='column';
+        left.innerHTML = `<strong>${escapeHtml(team.name)}</strong><span class="team-meta small">Gruppo: ${escapeHtml(team.group || '-') } · Giocatori: ${team.players.length}</span>`;
+
+        const right = document.createElement('div');
+        right.className = 'row';
+        const btnView = document.createElement('button');
+        btnView.textContent = 'Apri';
+        btnView.onclick = ()=> openTeamDetail(team.id);
+        right.appendChild(btnView);
+
+        li.appendChild(left);
+        li.appendChild(right);
+        ul.appendChild(li);
+      }
+      DOM.teamsCount.textContent = list.length;
+    }
+
+    function escapeHtml(s){
+      if(!s && s!==0) return '';
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function openTeamDetail(teamId){
+      const team = STATE.teams.find(t=>t.id==teamId);
+      if(!team){ showToast('Squadra non trovata'); return; }
+      // Apri dettaglio: per ora apriamo alert semplice (Parte 2 renderizzerà un pannello dettagliato)
+      let msg = `Squadra: ${team.name}\nGruppo: ${team.group || '-'}\nGiocatori:\n`;
+      for(const p of team.players){
+        msg += ` - ${p.number || '-'} ${p.name}\n`;
+      }
+      alert(msg);
+    }
+
+    /***********************
+     * IMPORT: Teams from Apps Script
+     ***********************/
+    async function importTeams(){
+      const url = DOM.GAS_URL.value.trim();
+      if(!url){ showToast('Inserisci l\'URL della WebApp di Apps Script'); return; }
+      setStatus('Import in corso…');
+      try {
+        const endpoint = new URL(url);
+        endpoint.searchParams.set('action','getTeams');
+        // optional: you can add an apiKey param if your script expects it
+        const data = await fetchJSON(endpoint.toString());
+        // Expected structure:
+        // { teams: [{id,name,group,players:[{id,name,number}]}], matches: [...] }
+        if(!data.teams) throw new Error('Risposta non valida: manca "teams"');
+        STATE.teams = data.teams.map((t, idx) => {
+          // normalizzazione minima
+          return {
+            id: t.id ?? ('team-'+idx),
+            name: t.name ?? `Squadra ${idx+1}`,
+            group: t.group ?? '',
+            players: (t.players || []).map((p, pi)=>({
+              id: p.id ?? (`${t.id||'team'}-p${pi}`),
+              name: p.name ?? `Giocatore ${pi+1}`,
+              number: p.number ?? ''
+            }))
+          };
+        });
+
+        // ricostruisci playersMap
+        STATE.playersMap = {};
+        for(const t of STATE.teams){
+          for(const p of t.players) STATE.playersMap[p.id] = {...p, teamId: t.id, teamName: t.name};
+        }
+
+        // se il server ha matches li memorizziamo (Parte 2/3 useremo le matches)
+        if(Array.isArray(data.matches)) STATE.matches = data.matches;
+
+        // popola filtri gruppi
+        populateGroupFilter();
+
+        renderTeamsList(DOM.searchTeam.value || '');
+        setStatus('Import completato');
+        showToast('Squadre importate correttamente');
+      } catch (err){
+        console.error(err);
+        setStatus('Errore import');
+        showToast('Errore import: ' + (err.message || err));
+      }
+    }
+
+    function populateGroupFilter(){
+      const groups = Array.from(new Set(STATE.teams.map(t => t.group || '').filter(Boolean))).sort();
+      DOM.filterGroup.innerHTML = '<option value="">Tutti i gruppi</option>';
+      for(const g of groups){
+        const opt = document.createElement('option');
+        opt.value = g; opt.textContent = g;
+        DOM.filterGroup.appendChild(opt);
+      }
+    }
+
+    /***********************
+     * LISTENERS
+     ***********************/
+    DOM.btnImportTeams.addEventListener('click', importTeams);
+    DOM.btnRefresh.addEventListener('click', ()=> {
+      renderTeamsList(DOM.searchTeam.value || '');
+      showToast('Lista aggiornata');
+    });
+    DOM.searchTeam.addEventListener('input', (e)=> renderTeamsList(e.target.value || ''));
+
+    DOM.btnLoadMatches.addEventListener('click', async ()=>{
+      // Caricamento partite (Parte 2/3 definirà la funzione fetchMatches)
+      const url = DOM.GAS_URL.value.trim();
+      if(!url){ showToast('Inserisci l\'URL della WebApp di Apps Script'); return; }
+      setStatus('Caricamento partite…');
+      try {
+        const endpoint = new URL(url);
+        endpoint.searchParams.set('action','getMatches');
+        const data = await fetchJSON(endpoint.toString());
+        // salviamo le matches (Parte 2 renderizzerà)
+        STATE.matches = Array.isArray(data.matches) ? data.matches : [];
+        renderMatchesList();
+        setStatus('Partite caricate');
+        showToast('Partite caricate');
+      } catch (err){
+        console.error(err);
+        setStatus('Errore caricamento partite');
+        showToast('Errore caricamento partite: ' + (err.message || err));
+      }
+    });
+
+    function renderMatchesList(){
+      const ul = DOM.matchesList;
+      ul.innerHTML = '';
+      const matches = (STATE.matches || []).sort((a,b)=> (a.datetime||'').localeCompare(b.datetime||''));
+      DOM.liveCount.textContent = `Partite aperte: ${matches.filter(m=>m.status==='live').length}`;
+      if(matches.length===0){
+        ul.innerHTML = '<li class="muted small">Nessuna partita caricata</li>';
+        return;
+      }
+      for(const m of matches){
+        const li = document.createElement('li');
+        li.style.display='flex'; li.style.justifyContent='space-between'; li.style.alignItems='center';
+        const left = document.createElement('div');
+        left.innerHTML = `<strong>${escapeHtml(m.teamA_name || m.teamA || 'Team A')} vs ${escapeHtml(m.teamB_name || m.teamB || 'Team B')}</strong>
+                          <div class="team-meta small">${escapeHtml(m.group || '')} · ${escapeHtml(m.datetime || '')}</div>`;
+        const right = document.createElement('div');
+        right.className='row';
+        const openBtn = document.createElement('button');
+        openBtn.textContent = 'Apri';
+        openBtn.onclick = ()=> openMatch(m.id);
+        right.appendChild(openBtn);
+        li.appendChild(left);
+        li.appendChild(right);
+        ul.appendChild(li);
+      }
+    }
+
+    function openMatch(matchId){
+      // Salviamo match corrente nello stato e mostriamo il pannello live
+      const match = STATE.matches.find(x=>x.id==matchId);
+      if(!match){ showToast('Partita non trovata'); return; }
+      STATE.currentMatch = match;
+      // Mostriamo il pannello live (il rendering dettagliato verrà completato nella Parte 2)
+      DOM.liveEntry.style.display = 'block';
+      DOM.liveMatchContainer.innerHTML = `<div class="muted small">Caricamento dati partita… (Parte 2 disegnerà la griglia giocatori)</div>`;
+      // In Parte 2 implementerò la funzione che costruisce le tabelle giocatore/gol/scalpi e MVP
+    }
+
+    // inizializzazione rapida: segnala istruzioni all'apertura
+    setTimeout(()=> {
+      setStatus('Inserisci l\'URL della WebApp e premi "Importa Squadre"');
+    }, 200);
+  </script>
+  <!-- Parte 2 continuerà da qui: ulteriori funzioni di rendering, gestione inserimento giocatori, calcolo punteggi, invio POST a Apps Script -->
+  /***********************
+   * PARTE 2: Rendering dettagliato partita, inserimento live, salvataggio su Apps Script
+   ***********************/
+
+    /**
+     * Costruisce l'interfaccia di inserimento live per la partita corrente.
+     * Mostra due colonne (Team A / Team B) con lista giocatori, input per gol/scalpi e selettore MVP.
+     */
+    function renderLiveMatchUI(){
+      const match = STATE.currentMatch;
+      if(!match) {
+        DOM.liveMatchContainer.innerHTML = `<div class="muted small">Nessuna partita selezionata.</div>`;
+        return;
+      }
+
+      // Assicuriamoci che match abbia campi teamA_players e teamB_players come array di playerId
+      const teamAplayers = resolvePlayersList(match.teamA_players || [], match.teamA, match.teamA_name);
+      const teamBplayers = resolvePlayersList(match.teamB_players || [], match.teamB, match.teamB_name);
+
+      // creiamo il markup
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'grid';
+      wrapper.style.gridTemplateColumns = '1fr 1fr';
+      wrapper.style.gap = '12px';
+      wrapper.innerHTML = `
+        <div class="card">
+          <h4>${escapeHtml(match.teamA_name || match.teamA || 'Team A')}</h4>
+          <div class="small muted">Giocatori & input</div>
+          <div id="teamA_grid"></div>
+          <div style="margin-top:8px">
+            <label class="small">MVP Team A</label>
+            <select id="mvpA" class="select" style="width:100%"><option value="">— seleziona —</option></select>
+          </div>
+          <div style="margin-top:8px" class="small muted">Totali: <span id="teamA_totals">Gol 0 · Scalpi 0</span></div>
+        </div>
+
+        <div class="card">
+          <h4>${escapeHtml(match.teamB_name || match.teamB || 'Team B')}</h4>
+          <div class="small muted">Giocatori & input</div>
+          <div id="teamB_grid"></div>
+          <div style="margin-top:8px">
+            <label class="small">MVP Team B</label>
+            <select id="mvpB" class="select" style="width:100%"><option value="">— seleziona —</option></select>
+          </div>
+          <div style="margin-top:8px" class="small muted">Totali: <span id="teamB_totals">Gol 0 · Scalpi 0</span></div>
+        </div>
+      `;
+
+      DOM.liveMatchContainer.innerHTML = '';
+      DOM.liveMatchContainer.appendChild(wrapper);
+
+      // Popola le griglie
+      populateTeamGrid('teamA_grid', teamAplayers);
+      populateTeamGrid('teamB_grid', teamBplayers);
+
+      // Popola MVP select
+      populateMVPSelect('mvpA', teamAplayers);
+      populateMVPSelect('mvpB', teamBplayers);
+
+      // Calcola totali iniziali
+      recalcTotalsAndListeners();
+    }
+
+    function resolvePlayersList(playerIdList, fallbackTeamKey, fallbackTeamName){
+      // playerIdList può essere array di oggetti {id,name,number} o solo array di id
+      const result = [];
+      if(!Array.isArray(playerIdList)) playerIdList = [];
+      for(const p of playerIdList){
+        if(typeof p === 'string' || typeof p === 'number'){
+          const pid = String(p);
+          const player = STATE.playersMap[pid];
+          if(player) result.push(player);
+          else result.push({id: pid, name: pid, number: ''});
+        } else if (p && p.id) {
+          result.push({id: p.id, name: p.name || '', number: p.number || ''});
+        } else {
+          // fallback generico
+          result.push({id: `p-${Math.random().toString(36).slice(2,7)}`, name: p.name || 'Giocatore', number: p.number || ''});
+        }
+      }
+      // se la lista è vuota (es. lo sheet non ha collegamenti), tentiamo di trovare squadre per nome
+      if(result.length===0 && fallbackTeamName){
+        const found = STATE.teams.find(t => (t.name||'').toLowerCase() === (fallbackTeamName||'').toLowerCase() || t.id == fallbackTeamKey);
+        if(found) return found.players;
+      }
+      return result;
+    }
+
+    function populateTeamGrid(containerId, players){
+      const container = document.getElementById(containerId);
+      container.innerHTML = '';
+      if(!players || players.length===0){
+        container.innerHTML = '<div class="muted small">Nessun giocatore disponibile</div>';
+        return;
+      }
+
+      const table = document.createElement('div');
+      table.style.display = 'grid';
+      table.style.gridTemplateColumns = '1fr 80px 80px';
+      table.style.gap = '8px';
+      table.style.alignItems = 'center';
+
+      // intestazione
+      const headerLeft = document.createElement('div'); headerLeft.innerHTML = '<strong>Giocatore</strong>';
+      const headerG = document.createElement('div'); headerG.innerHTML = '<strong>Gol</strong>';
+      const headerS = document.createElement('div'); headerS.innerHTML = '<strong>Scalpi</strong>';
+      table.appendChild(headerLeft); table.appendChild(headerG); table.appendChild(headerS);
+
+      for(const p of players){
+        const nameDiv = document.createElement('div');
+        nameDiv.innerHTML = `<div><strong>${escapeHtml(p.name || '')}</strong> <span class="small muted">#${escapeHtml(p.number || '')}</span></div>`;
+
+        const golInput = document.createElement('input');
+        golInput.type = 'number';
+        golInput.min = '0';
+        golInput.value = '0';
+        golInput.className = 'select';
+        golInput.style.width = '72px';
+        golInput.dataset.playerId = p.id;
+        golInput.dataset.stat = 'goals';
+
+        const scalpiInput = document.createElement('input');
+        scalpiInput.type = 'number';
+        scalpiInput.min = '0';
+        scalpiInput.value = '0';
+        scalpiInput.className = 'select';
+        scalpiInput.style.width = '72px';
+        scalpiInput.dataset.playerId = p.id;
+        scalpiInput.dataset.stat = 'scalps';
+
+        table.appendChild(nameDiv);
+        table.appendChild(golInput);
+        table.appendChild(scalpiInput);
+      }
+      container.appendChild(table);
+    }
+
+    function populateMVPSelect(selectId, players){
+      const sel = document.getElementById(selectId);
+      sel.innerHTML = '<option value="">— seleziona —</option>';
+      for(const p of players){
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.name || ''} ${p.number ? ('#'+p.number) : ''}`;
+        sel.appendChild(opt);
+      }
+    }
+
+    function recalcTotalsAndListeners(){
+      // aggiungi listener a tutti gli input numerici nella liveMatchContainer
+      const container = DOM.liveMatchContainer;
+      const inputs = container.querySelectorAll('input[type="number"]');
+      inputs.forEach(inp => {
+        inp.addEventListener('input', ()=> {
+          // pulisci valori non numerici
+          if(inp.value === '' || isNaN(inp.value)) inp.value = '0';
+          if(Number(inp.value) < 0) inp.value = '0';
+          updateTotalsDisplay();
+        });
+      });
+      updateTotalsDisplay();
+    }
+
+    function updateTotalsDisplay(){
+      // somma gol/scalpi per team
+      const teamA_tot = {goals:0, scalps:0};
+      const teamB_tot = {goals:0, scalps:0};
+      // distinguere inputs tramite container id presence
+      const teamA_inputs = document.querySelectorAll('#teamA_grid input[type="number"]');
+      const teamB_inputs = document.querySelectorAll('#teamB_grid input[type="number"]');
+
+      teamA_inputs.forEach(i=>{
+        if(i.dataset.stat==='goals') teamA_tot.goals += Number(i.value || 0);
+        if(i.dataset.stat==='scalps') teamA_tot.scalps += Number(i.value || 0);
+      });
+      teamB_inputs.forEach(i=>{
+        if(i.dataset.stat==='goals') teamB_tot.goals += Number(i.value || 0);
+        if(i.dataset.stat==='scalps') teamB_tot.scalps += Number(i.value || 0);
+      });
+
+      const ta = document.getElementById('teamA_totals');
+      const tb = document.getElementById('teamB_totals');
+      if(ta) ta.textContent = `Gol ${teamA_tot.goals} · Scalpi ${teamA_tot.scalps}`;
+      if(tb) tb.textContent = `Gol ${teamB_tot.goals} · Scalpi ${teamB_tot.scalps}`;
+    }
+
+    /***********************
+     * SALVATAGGIO: invia il risultato della partita al backend Apps Script
+     ***********************/
+    DOM.btnSaveLive.addEventListener('click', async ()=>{
+      if(!STATE.currentMatch) { showToast('Nessuna partita aperta'); return; }
+      const match = STATE.currentMatch;
+
+      // Costruiamo il payload leggendo gli inputs
+      const payload = {
+        action: 'saveMatch',
+        matchId: match.id,
+        datetime: new Date().toISOString(),
+        teamA: { id: match.teamA || match.teamA_id, name: match.teamA_name },
+        teamB: { id: match.teamB || match.teamB_id, name: match.teamB_name },
+        players: [], // {playerId, team, goals, scalps}
+        mvpA: document.getElementById('mvpA') ? document.getElementById('mvpA').value : '',
+        mvpB: document.getElementById('mvpB') ? document.getElementById('mvpB').value : '',
+        meta: {
+          savedBy: 'arbitro-web', // opzionale: lato Apps Script può leggere l'account
+          userAgent: navigator.userAgent
+        }
+      };
+
+      // raccogli input team A
+      const teamA_inputs = document.querySelectorAll('#teamA_grid input[type="number"]');
+      const seen = new Set();
+      teamA_inputs.forEach(i=>{
+        const pid = i.dataset.playerId;
+        if(!pid) return;
+        if(!payload.players.find(p=>p.playerId===pid)) payload.players.push({playerId: pid, team: 'A', goals: 0, scalps: 0});
+      });
+      // leggere i valori reali
+      teamA_inputs.forEach(i=>{
+        const pid = i.dataset.playerId; if(!pid) return;
+        const stat = i.dataset.stat;
+        const rec = payload.players.find(p=>p.playerId===pid);
+        if(rec){
+          if(stat==='goals') rec.goals = Number(i.value || 0);
+          if(stat==='scalps') rec.scalps = Number(i.value || 0);
+        }
+      });
+
+      // team B
+      const teamB_inputs = document.querySelectorAll('#teamB_grid input[type="number"]');
+      teamB_inputs.forEach(i=>{
+        const pid = i.dataset.playerId;
+        if(!pid) return;
+        if(!payload.players.find(p=>p.playerId===pid)) payload.players.push({playerId: pid, team: 'B', goals: 0, scalps: 0});
+      });
+      teamB_inputs.forEach(i=>{
+        const pid = i.dataset.playerId; if(!pid) return;
+        const stat = i.dataset.stat;
+        const rec = payload.players.find(p=>p.playerId===pid);
+        if(rec){
+          if(stat==='goals') rec.goals = Number(i.value || 0);
+          if(stat==='scalps') rec.scalps = Number(i.value || 0);
+        }
+      });
+
+      // Calcolo punteggio partita (vittoria/pareggio/sconfitta)
+      const totals = computeMatchTotalsFromPayload(payload);
+      payload.teamA.score = totals.teamA_goals;
+      payload.teamB.score = totals.teamB_goals;
+      payload.result = determineResult(totals.teamA_goals, totals.teamB_goals); // 'A'|'B'|'D' (draw)
+
+      // invio POST al WebApp
+      const url = DOM.GAS_URL.value.trim();
+      if(!url){ showToast('Inserisci l\'URL della WebApp di Apps Script'); return; }
+
+      try {
+        setStatus('Salvataggio risultato…');
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: {'Content-Type':'application/json'},
+          body: JSON.stringify(payload)
+        });
+        if(!res.ok) throw new Error('Errore rete ' + res.status);
+        const data = await res.json();
+        if(data && data.success){
+          // aggiorniamo stato locale: segniamo match come finished o updated secondo risposta
+          showToast('Risultato salvato');
+          // se il server ritorna la match aggiornata, sostituiscila
+          if(data.match) {
+            const idx = STATE.matches.findIndex(m=>m.id==data.match.id);
+            if(idx>=0) STATE.matches[idx] = data.match;
+            else STATE.matches.push(data.match);
+            renderMatchesList();
+          }
+          setStatus('Salvataggio completato');
+          // nascondi pannello live
+          DOM.liveEntry.style.display = 'none';
+        } else {
+          throw new Error((data && data.error) ? data.error : 'Risposta non valida dal server');
+        }
+      } catch (err){
+        console.error(err);
+        showToast('Errore salvataggio: ' + (err.message || err));
+        setStatus('Errore salvataggio');
+      }
+    });
+
+    DOM.btnCancelLive.addEventListener('click', ()=>{
+      DOM.liveEntry.style.display = 'none';
+      STATE.currentMatch = null;
+    });
+
+    function computeMatchTotalsFromPayload(payload){
+      const t = {teamA_goals:0, teamB_goals:0, teamA_scalps:0, teamB_scalps:0};
+      for(const p of payload.players){
+        if(p.team === 'A'){
+          t.teamA_goals += Number(p.goals || 0);
+          t.teamA_scalps += Number(p.scalps || 0);
+        } else {
+          t.teamB_goals += Number(p.goals || 0);
+          t.teamB_scalps += Number(p.scalps || 0);
+        }
+      }
+      return t;
+    }
+
+    function determineResult(aGoals, bGoals){
+      if(Number(aGoals) > Number(bGoals)) return 'A';
+      if(Number(bGoals) > Number(aGoals)) return 'B';
+      return 'D';
+    }
+
+    /***********************
+     * CALCOLO CLASSIFICA (da matches caricati)
+     * Ritorna oggetti per ogni squadra: {teamId, name, played, won, draw, lost, goalsFor, goalsAgainst, points}
+     ***********************/
+    function computeStandings(){
+      const table = {};
+      for(const m of STATE.matches || []){
+        // aspettarsi match con teamA_id/teamB_id o teamA/teamB
+        const aId = m.teamA || m.teamA_id || m.teamA_name;
+        const bId = m.teamB || m.teamB_id || m.teamB_name;
+        if(!table[aId]) table[aId] = {teamId: aId, name: m.teamA_name || m.teamA || aId, played:0, won:0, draw:0, lost:0, goalsFor:0, goalsAgainst:0, points:0};
+        if(!table[bId]) table[bId] = {teamId: bId, name: m.teamB_name || m.teamB || bId, played:0, won:0, draw:0, lost:0, goalsFor:0, goalsAgainst:0, points:0};
+
+        // leggere punteggio (se presente)
+        const aGoals = Number(m.teamA && m.teamA.score !== undefined ? m.teamA.score : (m.scoreA ?? m.goalsA ?? 0));
+        const bGoals = Number(m.teamB && m.teamB.score !== undefined ? m.teamB.score : (m.scoreB ?? m.goalsB ?? 0));
+
+        // aggiorna
+        table[aId].played += 1;
+        table[bId].played += 1;
+        table[aId].goalsFor += aGoals;
+        table[aId].goalsAgainst += bGoals;
+        table[bId].goalsFor += bGoals;
+        table[bId].goalsAgainst += aGoals;
+
+        if(aGoals > bGoals){
+          table[aId].won += 1; table[aId].points += 3;
+          table[bId].lost += 1;
+        } else if (bGoals > aGoals){
+          table[bId].won += 1; table[bId].points += 3;
+          table[aId].lost += 1;
+        } else {
+          table[aId].draw += 1; table[aId].points += 1;
+          table[bId].draw += 1; table[bId].points += 1;
+        }
+      }
+
+      // produce array ordinata
+      return Object.values(table).sort((x,y)=> y.points - x.points || (y.goalsFor - y.goalsAgainst) - (x.goalsFor - x.goalsAgainst) || y.goalsFor - x.goalsFor);
+    }
+
+    /***********************
+     * APERTURA PARTITA: quando l'utente preme "Apri" su una match, renderLiveMatchUI viene chiamata.
+     * Qui mettiamo la funzione che completa l'apertura (richiama i dati dei giocatori se necessario).
+     ***********************/
+    async function openMatch(matchId){
+      // Se STATE.matches ha la partita la usiamo; altrimenti la richiediamo al server
+      let match = STATE.matches.find(x=>x.id==matchId);
+      if(!match){
+        // fallback: richiedi singola partita
+        const url = DOM.GAS_URL.value.trim();
+        if(!url){ showToast('Inserisci l\'URL della WebApp di Apps Script'); return; }
+        try {
+          setStatus('Caricamento partita...');
+          const endpoint = new URL(url);
+          endpoint.searchParams.set('action','getMatch');
+          endpoint.searchParams.set('matchId', matchId);
+          const data = await fetchJSON(endpoint.toString());
+          match = data.match;
+        } catch (err){
+          console.error(err);
+          showToast('Errore caricamento partita: ' + (err.message || err));
+          return;
+        }
+      }
+      STATE.currentMatch = match;
+      DOM.liveEntry.style.display = 'block';
+      renderLiveMatchUI();
+    }
+
+    /***********************
+     * PICCOLE HELPERS
+     ***********************/
+    // Forza il ricalcolo della lista matches / teams quando lo stato cambia esternamente
+    function refreshAll(){
+      renderTeamsList(DOM.searchTeam.value || '');
+      renderMatchesList();
+    }
+
+    // Permette uno "smart paste" di una match generata esternamente (utile per arbitri in caso di problemi di rete)
+    // Questa funzione non è necessaria ma può essere utile: si passa un oggetto match e viene aggiunto a STATE.matches
+    function ingestExternalMatch(matchObj){
+      if(!matchObj || !matchObj.id) return;
+      const idx = STATE.matches.findIndex(m=>m.id==matchObj.id);
+      if(idx>=0) STATE.matches[idx] = matchObj;
+      else STATE.matches.push(matchObj);
+      renderMatchesList();
+    }
+
+    // Rendiamo disponibile in console computeStandings per debug
+    window.computeStandings = computeStandings;
+    window.ingestExternalMatch = ingestExternalMatch;
+
+    /***********************
+     * FINE Parte 2
+     * (Parte 3 chiuderà lo script, aggiungerà eventuali helper per esport, accessibilità, e il footer con istruzioni finali)
+     ***********************/
+  </script>
+      // Mostra i dati nella tabella
+      function displayMatches(matches) {
+        matchesTableBody.innerHTML = "";
+        matches.forEach((match, index) => {
+          const tr = document.createElement("tr");
+
+          tr.innerHTML = `
+            <td>${match.squadra1}</td>
+            <td>${match.squadra2}</td>
+            <td><input type="number" min="0" data-index="${index}" data-field="gol1" value="${match.gol1 || 0}" /></td>
+            <td><input type="number" min="0" data-index="${index}" data-field="scalpi1" value="${match.scalpi1 || 0}" /></td>
+            <td><input type="number" min="0" data-index="${index}" data-field="gol2" value="${match.gol2 || 0}" /></td>
+            <td><input type="number" min="0" data-index="${index}" data-field="scalpi2" value="${match.scalpi2 || 0}" /></td>
+            <td><input type="text" placeholder="MVP squadra 1" data-index="${index}" data-field="mvp1" value="${match.mvp1 || ""}" /></td>
+            <td><input type="text" placeholder="MVP squadra 2" data-index="${index}" data-field="mvp2" value="${match.mvp2 || ""}" /></td>
+            <td><button data-index="${index}" class="save-btn">Salva</button></td>
+          `;
+
+          matchesTableBody.appendChild(tr);
+        });
+
+        // Aggiungi listener ai bottoni "Salva"
+        document.querySelectorAll(".save-btn").forEach(btn => {
+          btn.addEventListener("click", async (e) => {
+            const index = e.target.dataset.index;
+            const inputs = document.querySelectorAll(`[data-index="${index}"]`);
+            let updatedData = {};
+            inputs.forEach(input => {
+              updatedData[input.dataset.field] = input.value;
+            });
+
+            try {
+              const response = await fetch("https://script.google.com/macros/s/AKfycbylbdZklWA8eSlq3UvPMupPHjna7fmBpKGMw290dRISocL-j2fgW3n8iS2I-olHTonI/exec", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                  action: "updateMatch",
+                  index,
+                  data: updatedData
+                })
+              });
+              const result = await response.json();
+              alert("Risultato salvato correttamente!");
+            } catch (error) {
+              console.error("Errore durante il salvataggio:", error);
+              alert("Errore durante il salvataggio.");
+            }
+          });
+        });
+      }
+
+      // Al caricamento, prendi i dati
+      loadData();
+    </script>
+  </body>
+</html>
