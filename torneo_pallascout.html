@@ -994,6 +994,11 @@
             if (!confirm('Sei sicuro di voler terminare questa partita?')) return;
             
             const match = matches.find(m => m.id === matchId);
+            if (!match) {
+                alert('Errore: partita non trovata');
+                return;
+            }
+            
             match.status = 'completed';
             match.completedAt = new Date().toISOString();
             
@@ -1011,6 +1016,11 @@
             const homeTeam = teams.find(t => t.id === match.homeTeamId);
             const awayTeam = teams.find(t => t.id === match.awayTeamId);
             
+            if (!homeTeam || !awayTeam) {
+                alert('Errore: squadre non trovate');
+                return;
+            }
+            
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
@@ -1018,7 +1028,7 @@
                 <div class="modal-content">
                     <span class="close" onclick="this.parentElement.parentElement.remove()">&times;</span>
                     <h3>✅ Partita Completata!</h3>
-                    <p><strong>${homeTeam.name} ${match.homeScore} - ${match.awayScore} ${awayTeam.name}</strong></p>
+                    <p><strong>${homeTeam.name} ${match.homeScore || 0} - ${match.awayScore || 0} ${awayTeam.name}</strong></p>
                     <p>Campo: ${match.field}</p>
                     
                     <div style="margin: 20px 0;">
@@ -1046,7 +1056,7 @@
                     </div>
                     
                     <div style="margin-top: 20px; text-align: center;">
-                        <button class="btn btn-secondary" onclick="this.parentElement.parentElement.remove(); updateRefereeMatchSelect(); document.getElementById('refereePanel').innerHTML = '';">
+                        <button class="btn btn-secondary" onclick="closeMatchCompletedModal()">
                             Chiudi
                         </button>
                     </div>
@@ -1054,6 +1064,15 @@
             `;
             
             document.body.appendChild(modal);
+        }
+
+        function closeMatchCompletedModal() {
+            const modal = document.querySelector('.modal');
+            if (modal) {
+                modal.remove();
+            }
+            updateRefereeMatchSelect();
+            document.getElementById('refereePanel').innerHTML = '';
         }
 
         function generateMatchReport(matchId) {
