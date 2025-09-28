@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>24OredelleGrazie</title>
+    <title>24 Ore delle Grazie</title>
     
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#3498db">
@@ -385,7 +385,7 @@
         <!-- PWA Install Banner -->
         <div id="installBanner" class="install-banner">
             <div>
-                📱 <strong>Installa l'App ufficiale della 24OdG</strong><br>
+                📱 <strong>Installa l'App ufficiale della 24OredelleGrazie</strong><br>
                 <small>Accesso rapido e funzionalità offline</small><br>
                 <button id="installBtn" class="install-btn">⬇️ Installa</button>
                 <button id="dismissBtn" class="install-btn">❌ Chiudi</button>
@@ -912,16 +912,18 @@
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+<h5>gol</h5><br>                                            
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+<h5>scalpi</h5><br>                                             
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
                                             <label style="display: flex; align-items: center; justify-content: center;">
                                                 <input type="radio" name="homeMVP" value="${player.id}" 
                                                        ${match.homeMVP === player.id ? 'checked' : ''}
-                                                       onchange="updateMVP(${match.id}, 'home', ${player.id})"> MVP
+                                                       onchange="updateMVP(${match.id}, 'home', ${player.id})"> 🏆MVP
                                             </label>
                                         </div>
                                     </div>
@@ -936,16 +938,18 @@
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+<h5>gol</h5><br>                                             
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+<h5>scalpi</h5><br>                                              
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
                                             <label style="display: flex; align-items: center; justify-content: center;">
                                                 <input type="radio" name="awayMVP" value="${player.id}" 
                                                        ${match.awayMVP === player.id ? 'checked' : ''}
-                                                       onchange="updateMVP(${match.id}, 'away', ${player.id})"> MVP
+                                                       onchange="updateMVP(${match.id}, 'away', ${player.id})"> 🏆MVP
                                             </label>
                                         </div>
                                     </div>
@@ -1101,114 +1105,6 @@
             `;
             
             document.body.appendChild(modal);
-        }
-
-        function sendMatchByWhatsApp(matchId) {
-            const report = generateMatchReport(matchId);
-            const encodedReport = encodeURIComponent(report);
-            
-            const organizerPhone = prompt('Inserisci numero WhatsApp organizzatore (con prefisso, es: +393401234567):', '+39');
-            if (!organizerPhone || organizerPhone === '+39') return;
-            
-            const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
-            const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
-            
-            try {
-                window.open(whatsappLink, '_blank');
-                showNotification('✅ WhatsApp aperto! Se non funziona, usa "Copia Dati negli Appunti".');
-                closeMatchCompletedModal();
-            } catch (error) {
-                alert('Errore WhatsApp: ' + error.message);
-                copyMatchData(matchId);
-            }
-        }
-
-        function copyMatchData(matchId) {
-            const report = generateMatchReport(matchId);
-            
-            if (navigator.clipboard) {
-                navigator.clipboard.writeText(report).then(() => {
-                    showNotification('✅ Dati della partita copiati negli appunti! Ora puoi incollarli dove preferisci.');
-                    closeMatchCompletedModal();
-                }).catch(() => {
-                    fallbackCopyTextToClipboard(report);
-                });
-            } else {
-                fallbackCopyTextToClipboard(report);
-            }
-        }
-
-        function fallbackCopyTextToClipboard(text) {
-            const textArea = document.createElement("textarea");
-            textArea.value = text;
-            textArea.style.top = "0";
-            textArea.style.left = "0";
-            textArea.style.position = "fixed";
-            document.body.appendChild(textArea);
-            textArea.focus();
-            textArea.select();
-            
-            try {
-                document.execCommand('copy');
-                showNotification('✅ Dati della partita copiati negli appunti!');
-                closeMatchCompletedModal();
-            } catch (err) {
-                alert('❌ Impossibile copiare automaticamente. Seleziona e copia manualmente il testo che apparirà.');
-                prompt('Copia questo testo:', text);
-            }
-            
-            document.body.removeChild(textArea);
-        }
-
-        function generateMatchReport(matchId) {
-            const match = matches.find(m => m.id === matchId);
-            const homeTeam = teams.find(t => t.id === match.homeTeamId);
-            const awayTeam = teams.find(t => t.id === match.awayTeamId);
-            
-            let report = `🏆 REPORT PARTITA PALLASCOUT 🏆\n\n`;
-            report += `📅 Data: ${new Date(match.completedAt || new Date()).toLocaleString('it-IT')}\n`;
-            report += `🏟️ Campo: ${match.field}\n`;
-            report += `📊 Risultato: ${homeTeam.name} ${match.homeScore || 0} - ${match.awayScore || 0} ${awayTeam.name}\n\n`;
-            
-            // Statistiche squadra casa
-            report += `🏠 ${homeTeam.name.toUpperCase()}\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            homeTeam.players.forEach(player => {
-                const stats = match.playerStats ? match.playerStats[player.id] : null;
-                if (stats && (stats.goals > 0 || stats.scalps > 0)) {
-                    report += `#${player.number} ${player.name}: ${stats.goals || 0} gol, ${stats.scalps || 0} scalpi`;
-                    if (match.homeMVP === player.id) report += ` ⭐ MVP`;
-                    report += `\n`;
-                }
-            });
-            
-            // Statistiche squadra ospite  
-            report += `\n🚌 ${awayTeam.name.toUpperCase()}\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            awayTeam.players.forEach(player => {
-                const stats = match.playerStats ? match.playerStats[player.id] : null;
-                if (stats && (stats.goals > 0 || stats.scalps > 0)) {
-                    report += `#${player.number} ${player.name}: ${stats.goals || 0} gol, ${stats.scalps || 0} scalpi`;
-                    if (match.awayMVP === player.id) report += ` ⭐ MVP`;
-                    report += `\n`;
-                }
-            });
-            
-            report += `\n📋 ARBITRO: ${getArbitratorName() || 'N/D'}\n`;
-            report += `\n🔢 ID PARTITA: ${match.id}\n`;
-            report += `━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n`;
-            report += `Generato da: Torneo Pallascout App`;
-            
-            return report;
-        }
-
-        function closeMatchCompletedModal() {
-            const modal = document.querySelector('.modal');
-            if (modal) {
-                modal.remove();
-            }
-            updateRefereeMatchSelect();
-            document.getElementById('refereePanel').innerHTML = '';
         }
 
         function sendMatchByWhatsApp(matchId) {
