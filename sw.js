@@ -1,5 +1,5 @@
 ```javascript
-const CACHE_NAME = 'pallascout-v1.0.0';
+const CACHE_NAME = '24OdG-v1.0.0';
 const urlsToCache = [
   '/',
   '/index.html',
