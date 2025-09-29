@@ -4,9 +4,9 @@
 ```javascript
 const CACHE_NAME = '24OdG-v1.0.0';
 const urlsToCache = [
-  '/24OredelleGrazie/',
-  '/24OredelleGrazie/index.html',
-  '/24OredelleGrazie/manifest.json''
+  'https://stepengo.github.io/24OredelleGrazie/',
+  'https://stepengo.github.io/24OredelleGrazie/index.html',
+  'https://stepengo.github.io/24OredelleGrazie/manifest.json''
 ];
 
 
