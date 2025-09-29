@@ -1,10 +1,23 @@
+
+
+
 ```javascript
 const CACHE_NAME = '24OdG-v1.0.0';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  '/24OredelleGrazie/',
+  '/24OredelleGrazie/index.html',
+  '/24OredelleGrazie/manifest.json''
 ];
+
+
+const CACHE_NAME = 'pallascout-v1';
+const urlsToCache = [
+  
+];
+
+
+
+
 
 // Installa il service worker
 self.addEventListener('install', function(event) {
