@@ -1,23 +1,9 @@
-
-
-
-```javascript
 const CACHE_NAME = '24OdG-v1.0.0';
 const urlsToCache = [
   'https://stepengo.github.io/24OredelleGrazie/',
   'https://stepengo.github.io/24OredelleGrazie/index.html',
-  'https://stepengo.github.io/24OredelleGrazie/manifest.json''
+  'https://stepengo.github.io/24OredelleGrazie/manifest.json'
 ];
-
-
-const CACHE_NAME = 'pallascout-v1';
-const urlsToCache = [
-  
-];
-
-
-
-
 
 // Installa il service worker
 self.addEventListener('install', function(event) {
@@ -35,21 +21,16 @@ self.addEventListener('fetch', function(event) {
   event.respondWith(
     caches.match(event.request)
       .then(function(response) {
-        // Cache hit - restituisci la risposta dalla cache
         if (response) {
           return response;
         }
 
         return fetch(event.request).then(
           function(response) {
-            // Controlla se abbiamo ricevuto una risposta valida
             if(!response || response.status !== 200 || response.type !== 'basic') {
               return response;
             }
 
-            // IMPORTANTE: Clona la risposta. Una risposta è uno stream
-            // e poiché vogliamo sia il browser che la cache che la consumino,
-            // dobbiamo clonarla così abbiamo due stream.
             var responseToCache = response.clone();
 
             caches.open(CACHE_NAME)
@@ -87,7 +68,7 @@ self.addEventListener('message', function(event) {
   }
 });
 
-// Notifiche push (opzionale per future funzionalità)
+// Notifiche push
 self.addEventListener('push', function(event) {
   if (event.data) {
     const options = {
@@ -97,8 +78,7 @@ self.addEventListener('push', function(event) {
     };
 
     event.waitUntil(
-      self.registration.showNotification('Torneo Pallascout', options)
+      self.registration.showNotification('24 Ore delle Grazie', options)
     );
   }
 });
-``` 
