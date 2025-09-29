@@ -414,34 +414,46 @@
             <h2>Gestione Squadre</h2>
             
             <div class="card">
-                <h3>📥 Importa da Google Sheets</h3>
-                <p>Importa squadre e giocatori direttamente da un foglio Google:</p>
-                
-                <div style="margin: 20px 0;">
-                    <div class="form-group">
-                        <label>🔗 URL Google Sheets (pubblico):</label>
-                        <input type="url" id="googleSheetsUrl" placeholder="https://docs.google.com/spreadsheets/d/ID_DEL_FOGLIO/edit#gid=0" style="width: 100%;">
-                        <small style="color: #666;">Il foglio deve essere pubblico (condiviso con "chiunque abbia il link può visualizzare")</small>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label>📋 Nome Foglio (opzionale):</label>
-                        <input type="text" id="sheetName" placeholder="Foglio1" value="Foglio1">
-                        <small style="color: #666;">Nome del tab nel Google Sheets (default: Foglio1)</small>
-                    </div>
-                    
-                    <button class="btn btn-success" onclick="importFromGoogleSheets()">
-                        📊 Importa da Google Sheets
-                    </button>
-                    
-                    <button class="btn btn-info" onclick="showGoogleSheetsFormat()">
-                        ❓ Formato Richiesto
-                    </button>
-                </div>
+                <h3>📊 Importa da Google Sheets</h3>
+                <p>Importa squadre e giocatori copiando i dati dal tuo foglio:</p>
                 
                 <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 10px 0;">
-                    <strong>💡 Formato Google Sheets richiesto:</strong><br>
-                    <code>Colonna A: Squadra | Colonna B: Nome Giocatore | Colonna C: Numero Maglia</code>
+                    <strong>📝 Come fare:</strong>
+                    <ol style="margin: 10px 0; padding-left: 20px;">
+                        <li>Apri il tuo <strong>Google Sheets</strong></li>
+                        <li>Seleziona le celle con: <code>Squadra | Nome Giocatore | Numero</code></li>
+                        <li>Copia tutto (<kbd>Ctrl+C</kbd> o <kbd>Cmd+C</kbd>)</li>
+                        <li>Incolla nel campo qui sotto</li>
+                        <li>Clicca "Importa"</li>
+                    </ol>
+                </div>
+                
+                <div class="form-group">
+                    <label>📋 Incolla qui i dati da Google Sheets:</label>
+                    <textarea id="importTeamsData" 
+                              style="width: 100%; height: 250px; font-family: monospace; font-size: 13px;" 
+                              placeholder="Esempio formato:
+Squadra A    Mario Rossi      10
+Squadra A    Luigi Verdi      7
+Squadra A    Paolo Bianchi    5
+Squadra B    Andrea Neri      9
+Squadra B    Marco Blu        11
+
+Oppure separato da virgole:
+Squadra A, Mario Rossi, 10
+Squadra A, Luigi Verdi, 7"></textarea>
+                </div>
+                
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button class="btn btn-success" onclick="importTeamsFromText()">
+                        📊 Importa Dati
+                    </button>
+                    <button class="btn btn-info" onclick="showImportExample()">
+                        ❓ Vedi Esempio
+                    </button>
+                    <button class="btn btn-warning" onclick="downloadTemplate()">
+                        📥 Scarica Template
+                    </button>
                 </div>
             </div>
             
@@ -2060,330 +2072,205 @@
             }
         }
 
-        // GOOGLE SHEETS IMPORT FUNCTIONS
-        function importFromGoogleSheets() {
-            const url = document.getElementById('googleSheetsUrl').value.trim();
-            const sheetName = document.getElementById('sheetName').value.trim() || 'Foglio1';
+        // IMPORT TEAMS FROM TEXT (SIMPLIFIED AND RELIABLE)
+        function importTeamsFromText() {
+            const data = document.getElementById('importTeamsData').value.trim();
             
-            if (!url) {
-                alert('Inserisci l\'URL del Google Sheets');
+            if (!data) {
+                alert('❌ Incolla i dati da Google Sheets prima di importare!');
                 return;
             }
-            
-            if (!url.includes('docs.google.com/spreadsheets')) {
-                alert('URL non valido. Deve essere un link di Google Sheets');
-                return;
-            }
-            
-            showNotification('📊 Importazione in corso...');
             
             try {
-                // Estrai l'ID del foglio dall'URL
-                const sheetId = extractSheetId(url);
-                if (!sheetId) {
-                    alert('Impossibile estrarre l\'ID del foglio dall\'URL');
+                const lines = data.split('\n').filter(line => line.trim());
+                
+                if (lines.length === 0) {
+                    alert('❌ Nessun dato trovato!');
                     return;
                 }
                 
-                // Costruisci URL per CSV export
-                const csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv&sheet=${encodeURIComponent(sheetName)}`;
-                
-                // Usa un proxy CORS per evitare problemi
-                const proxyUrl = `https://api.allorigins.win/get?url=${encodeURIComponent(csvUrl)}`;
-                
-                fetch(proxyUrl)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.status.http_code === 200) {
-                            parseGoogleSheetsData(data.contents);
-                        } else {
-                            throw new Error('Errore nel caricamento del foglio');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('Errore:', error);
-                        showAlternativeImportMethod();
-                    });
-                    
-            } catch (error) {
-                console.error('Errore:', error);
-                showAlternativeImportMethod();
-            }
-        }
-        
-        function extractSheetId(url) {
-            const match = url.match(/\\/spreadsheets\\/d\\/([a-zA-Z0-9-_]+)/);
-            return match ? match[1] : null;
-        }
-        
-        function parseGoogleSheetsData(csvData) {
-            try {
-                const lines = csvData.split('\\n');
                 let importedTeams = 0;
                 let importedPlayers = 0;
                 let errors = [];
-                
-                // Mappa per tenere traccia delle squadre
                 const teamMap = new Map();
                 
                 lines.forEach((line, index) => {
-                    if (index === 0 || !line.trim()) return; // Salta header e righe vuote
+                    // Prova diversi separatori: tab, virgola, spazi multipli
+                    let columns;
                     
-                    const columns = parseCSVLine(line);
-                    
-                    if (columns.length >= 3) {
-                        const squadra = columns[0].trim();
-                        const nomeGiocatore = columns[1].trim();
-                        const numeroMaglia = parseInt(columns[2]);
-                        
-                        if (squadra && nomeGiocatore && numeroMaglia) {
-                            // Crea squadra se non esiste
-                            if (!teamMap.has(squadra)) {
-                                const team = {
-                                    id: Date.now() + Math.random(),
-                                    name: squadra,
-                                    players: [],
-                                    stats: {
-                                        matches: 0, wins: 0, draws: 0, losses: 0,
-                                        points: 0, goalsFor: 0, goalsAgainst: 0,
-                                        scalpFor: 0, scalpAgainst: 0
-                                    }
-                                };
-                                teams.push(team);
-                                teamMap.set(squadra, team);
-                                importedTeams++;
-                            }
-                            
-                            const team = teamMap.get(squadra);
-                            
-                            // Controlla numero maglia duplicato
-                            if (!team.players.some(p => p.number === numeroMaglia)) {
-                                const player = {
-                                    id: Date.now() + Math.random(),
-                                    name: nomeGiocatore,
-                                    number: numeroMaglia,
-                                    stats: { goals: 0, scalps: 0, mvp: 0 }
-                                };
-                                team.players.push(player);
-                                importedPlayers++;
-                            } else {
-                                errors.push(`Numero maglia ${numeroMaglia} duplicato in ${squadra}`);
-                            }
-                        }
+                    if (line.includes('\t')) {
+                        columns = line.split('\t');
+                    } else if (line.includes(',')) {
+                        columns = line.split(',');
+                    } else {
+                        columns = line.split(/\s{2,}/); // 2 o più spazi
                     }
-                });
-                
-                saveData();
-                displayTeams();
-                
-                let message = `✅ Importazione completata!\\n\\n`;
-                message += `📊 ${importedTeams} squadre importate\\n`;
-                message += `👥 ${importedPlayers} giocatori importati`;
-                
-                if (errors.length > 0) {
-                    message += `\\n\\n⚠️ Avvisi:\\n${errors.join('\\n')}`;
-                }
-                
-                alert(message);
-                showNotification('✅ Importazione completata con successo!');
-                
-            } catch (error) {
-                console.error('Errore parsing:', error);
-                alert('Errore nell\\'elaborazione dei dati. Controlla il formato del foglio.');
-            }
-        }
-        
-        function parseCSVLine(line) {
-            const result = [];
-            let current = '';
-            let inQuotes = false;
-            
-            for (let i = 0; i < line.length; i++) {
-                const char = line[i];
-                
-                if (char === '"') {
-                    inQuotes = !inQuotes;
-                } else if (char === ',' && !inQuotes) {
-                    result.push(current);
-                    current = '';
-                } else {
-                    current += char;
-                }
-            }
-            
-            result.push(current);
-            return result.map(item => item.replace(/^"|"$/g, ''));
-        }
-        
-        function showAlternativeImportMethod() {
-            const modal = document.createElement('div');
-            modal.className = 'modal';
-            modal.style.display = 'block';
-            modal.innerHTML = `
-                <div class="modal-content">
-                    <span class="close" onclick="this.remove()">&times;</span>
-                    <h3>📋 Importazione Alternativa</h3>
-                    <p>Non riesco ad accedere direttamente al Google Sheets. Usa questo metodo alternativo:</p>
                     
-                    <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
-                        <h4>📝 Passo 1: Copia i dati</h4>
-                        <ol>
-                            <li>Apri il tuo Google Sheets</li>
-                            <li>Seleziona tutte le celle con i dati (A1:C...)</li>
-                            <li>Copia (Ctrl+C)</li>
-                        </ol>
-                        
-                        <h4 style="margin-top: 15px;">📋 Passo 2: Incolla qui</h4>
-                        <textarea id="manualImportData" 
-                                  style="width: 100%; height: 200px; margin: 10px 0;" 
-                                  placeholder="Incolla qui i dati copiati da Google Sheets...\\n\\nSquadra A    Mario Rossi    10\\nSquadra A    Luigi Bianchi  7\\nSquadra B    Paolo Verdi    9"></textarea>
-                        
-                        <button class="btn btn-success" onclick="importFromPastedData()">
-                            📊 Importa Dati Incollati
-                        </button>
-                    </div>
-                </div>
-            `;
-            document.body.appendChild(modal);
-        }
-        
-        function importFromPastedData() {
-            const data = document.getElementById('manualImportData').value.trim();
-            if (!data) {
-                alert('Incolla i dati da Google Sheets');
-                return;
-            }
-            
-            try {
-                const lines = data.split('\\n');
-                let importedTeams = 0;
-                let importedPlayers = 0;
-                let errors = [];
-                
-                const teamMap = new Map();
-                
-                lines.forEach((line, index) => {
-                    if (!line.trim()) return;
-                    
-                    // Split per tab o virgola o spazi multipli
-                    const columns = line.split(/\\t|,|\\s{2,}/).map(col => col.trim());
+                    columns = columns.map(col => col.trim()).filter(col => col);
                     
                     if (columns.length >= 3) {
                         const squadra = columns[0];
                         const nomeGiocatore = columns[1];
                         const numeroMaglia = parseInt(columns[2]);
                         
-                        if (squadra && nomeGiocatore && numeroMaglia) {
-                            if (!teamMap.has(squadra)) {
-                                const team = {
-                                    id: Date.now() + Math.random(),
-                                    name: squadra,
-                                    players: [],
-                                    stats: {
-                                        matches: 0, wins: 0, draws: 0, losses: 0,
-                                        points: 0, goalsFor: 0, goalsAgainst: 0,
-                                        scalpFor: 0, scalpAgainst: 0
-                                    }
-                                };
-                                teams.push(team);
-                                teamMap.set(squadra, team);
-                                importedTeams++;
-                            }
-                            
-                            const team = teamMap.get(squadra);
-                            
-                            if (!team.players.some(p => p.number === numeroMaglia)) {
-                                const player = {
-                                    id: Date.now() + Math.random(),
-                                    name: nomeGiocatore,
-                                    number: numeroMaglia,
-                                    stats: { goals: 0, scalps: 0, mvp: 0 }
-                                };
-                                team.players.push(player);
-                                importedPlayers++;
-                            } else {
-                                errors.push(`Numero ${numeroMaglia} duplicato in ${squadra}`);
-                            }
+                        if (!squadra || !nomeGiocatore || isNaN(numeroMaglia)) {
+                            errors.push(`Riga ${index + 1}: dati incompleti`);
+                            return;
                         }
+                        
+                        // Crea squadra se non esiste
+                        if (!teamMap.has(squadra)) {
+                            const team = {
+                                id: Date.now() + Math.random() * 1000,
+                                name: squadra,
+                                players: [],
+                                stats: {
+                                    matches: 0, wins: 0, draws: 0, losses: 0,
+                                    points: 0, goalsFor: 0, goalsAgainst: 0,
+                                    scalpFor: 0, scalpAgainst: 0
+                                }
+                            };
+                            teams.push(team);
+                            teamMap.set(squadra, team);
+                            importedTeams++;
+                        }
+                        
+                        const team = teamMap.get(squadra);
+                        
+                        // Controlla numero maglia duplicato
+                        if (team.players.some(p => p.number === numeroMaglia)) {
+                            errors.push(`Riga ${index + 1}: numero ${numeroMaglia} già usato in ${squadra}`);
+                            return;
+                        }
+                        
+                        // Aggiungi giocatore
+                        const player = {
+                            id: Date.now() + Math.random() * 1000,
+                            name: nomeGiocatore,
+                            number: numeroMaglia,
+                            stats: { goals: 0, scalps: 0, mvp: 0 }
+                        };
+                        team.players.push(player);
+                        importedPlayers++;
+                        
+                    } else {
+                        errors.push(`Riga ${index + 1}: formato non valido (servono 3 colonne)`);
                     }
                 });
                 
+                if (importedPlayers === 0) {
+                    alert('❌ Nessun giocatore importato! Controlla il formato dei dati.');
+                    return;
+                }
+                
                 saveData();
                 displayTeams();
-                document.querySelector('.modal').remove();
+                document.getElementById('importTeamsData').value = '';
                 
-                let message = `✅ Importazione completata!\\n\\n`;
-                message += `📊 ${importedTeams} squadre importate\\n`;
+                // Messaggio di successo
+                let message = `✅ IMPORTAZIONE COMPLETATA!\n\n`;
+                message += `📊 ${importedTeams} squadre importate\n`;
                 message += `👥 ${importedPlayers} giocatori importati`;
                 
                 if (errors.length > 0) {
-                    message += `\\n\\n⚠️ Avvisi:\\n${errors.slice(0, 5).join('\\n')}`;
+                    message += `\n\n⚠️ Avvisi (${errors.length}):\n`;
+                    message += errors.slice(0, 5).join('\n');
                     if (errors.length > 5) {
-                        message += `\\n... e altri ${errors.length - 5} errori`;
+                        message += `\n... e altri ${errors.length - 5} avvisi`;
                     }
                 }
                 
                 alert(message);
-                showNotification('✅ Importazione completata!');
+                showNotification('✅ Importazione completata con successo!');
                 
             } catch (error) {
-                alert('Errore nell\\'elaborazione dei dati: ' + error.message);
+                console.error('Errore importazione:', error);
+                alert('❌ Errore nell\'importazione: ' + error.message);
             }
         }
         
-        function showGoogleSheetsFormat() {
+        function showImportExample() {
             const modal = document.createElement('div');
             modal.className = 'modal';
             modal.style.display = 'block';
             modal.innerHTML = `
-                <div class="modal-content">
+                <div class="modal-content" style="max-width: 800px;">
                     <span class="close" onclick="this.remove()">&times;</span>
-                    <h3>📋 Formato Google Sheets Richiesto</h3>
+                    <h3>📋 Esempi di Formato Importazione</h3>
                     
                     <div style="margin: 20px 0;">
-                        <h4>📊 Struttura del Foglio:</h4>
-                        <table class="table" style="margin: 10px 0;">
-                            <thead>
-                                <tr>
-                                    <th>A (Squadra)</th>
-                                    <th>B (Nome Giocatore)</th>
-                                    <th>C (Numero Maglia)</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td>Squadra A</td><td>Mario Rossi</td><td>10</td></tr>
-                                <tr><td>Squadra A</td><td>Luigi Bianchi</td><td>7</td></tr>
-                                <tr><td>Squadra A</td><td>Paolo Verdi</td><td>9</td></tr>
-                                <tr><td>Squadra B</td><td>Andrea Neri</td><td>10</td></tr>
-                                <tr><td>Squadra B</td><td>Marco Blu</td><td>8</td></tr>
-                            </tbody>
-                        </table>
+                        <h4>✅ Formato 1: Separato da TAB (Google Sheets standard)</h4>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;">
+Squadra A    Mario Rossi      10<br>
+Squadra A    Luigi Verdi      7<br>
+Squadra A    Paolo Bianchi    5<br>
+Squadra B    Andrea Neri      9<br>
+Squadra B    Marco Blu        11
+                        </div>
                     </div>
                     
-                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px; margin: 15px 0;">
-                        <h4>⚠️ Importante:</h4>
-                        <ul style="margin: 10px 0; padding-left: 20px;">
-                            <li>Il foglio deve essere <strong>pubblico</strong> ("chiunque con il link può visualizzare")</li>
-                            <li>Non deve esserci header nella prima riga</li>
-                            <li>I numeri maglia devono essere univoci per squadra</li>
-                            <li>Ogni riga rappresenta un giocatore</li>
-                        </ul>
+                    <div style="margin: 20px 0;">
+                        <h4>✅ Formato 2: Separato da virgole (CSV)</h4>
+                        <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 12px;">
+Squadra A, Mario Rossi, 10<br>
+Squadra A, Luigi Verdi, 7<br>
+Squadra A, Paolo Bianchi, 5<br>
+Squadra B, Andrea Neri, 9<br>
+Squadra B, Marco Blu, 11
+                        </div>
                     </div>
                     
-                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px;">
-                        <h4>✅ Come rendere pubblico il Google Sheets:</h4>
+                    <div style="background: #e8f5e8; padding: 15px; border-radius: 8px; margin: 15px 0;">
+                        <h4>📝 Come copiare da Google Sheets:</h4>
                         <ol style="margin: 10px 0; padding-left: 20px;">
-                            <li>Apri il Google Sheets</li>
-                            <li>Clicca "Condividi" in alto a destra</li>
-                            <li>Clicca "Cambia" accanto a "Limitato"</li>
-                            <li>Seleziona "Chiunque abbia il link"</li>
-                            <li>Assicurati che sia impostato su "Visualizzatore"</li>
-                            <li>Clicca "Fine" e copia il link</li>
+                            <li>Apri il tuo Google Sheets</li>
+                            <li>Seleziona tutte le celle (trascina o Ctrl+A)</li>
+                            <li>Copia (Ctrl+C o Cmd+C)</li>
+                            <li>Incolla nell'app (Ctrl+V o Cmd+V)</li>
+                            <li>Clicca "Importa Dati"</li>
                         </ol>
+                    </div>
+                    
+                    <div style="background: #fff3cd; padding: 15px; border-radius: 8px;">
+                        <h4>⚠️ Regole importanti:</h4>
+                        <ul style="margin: 10px 0; padding-left: 20px;">
+                            <li>Ogni riga = un giocatore</li>
+                            <li>Tre colonne: <strong>Squadra</strong>, <strong>Nome</strong>, <strong>Numero</strong></li>
+                            <li>I numeri di maglia devono essere unici per squadra</li>
+                            <li>Non servono intestazioni (header)</li>
+                        </ul>
                     </div>
                 </div>
             `;
             document.body.appendChild(modal);
+        }
+        
+        function downloadTemplate() {
+            const template = `Squadra A\tMario Rossi\t10
+Squadra A\tLuigi Verdi\t7
+Squadra A\tPaolo Bianchi\t5
+Squadra A\tAndrea Gialli\t3
+Squadra A\tMarco Blu\t1
+Squadra B\tGiovanni Neri\t9
+Squadra B\tFrancesco Rosa\t11
+Squadra B\tAlessandro Oro\t8
+Squadra B\tLuca Argento\t4
+Squadra B\tMatteo Bronzo\t2
+Squadra C\tDavide Verde\t10
+Squadra C\tSimone Celeste\t7
+Squadra C\tRoberto Viola\t6`;
+
+            const blob = new Blob([template], { type: 'text/plain;charset=utf-8' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'template_squadre_pallascout.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            showNotification('📥 Template scaricato! Modificalo e importalo nell\'app.');
         }
 
         // Inizializzazione
