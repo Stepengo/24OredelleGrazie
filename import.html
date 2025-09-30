@@ -626,15 +626,7 @@ Squadra A, Luigi Verdi, 7"></textarea>
     </div>
 
     <script>
-       if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/24OredelleGrazie/sw.js')
-    .then(function(registration) {
-      console.log('Service Worker registrato:', registration);
-    })
-    .catch(function(error) {
-      console.log('Errore registrazione:', error);
-    });
-}
+
         
         // Strutture dati
         let teams = JSON.parse(localStorage.getItem('pallascout_teams') || '[]');
@@ -2312,13 +2304,15 @@ Squadra C\tRoberto Viola\t6`;
             isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
             
             // Registra Service Worker
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                    console.log('Service Worker registrato con successo:', registration);
-                }).catch(function(error) {
-                    console.log('Registrazione Service Worker fallita:', error);
-                });
-            }
+           if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js')
+    .then(function(registration) {
+      console.log('Service Worker registrato:', registration);
+    })
+    .catch(function(error) {
+      console.log('Errore registrazione:', error);
+    });
+}
 
             // Gestisci beforeinstallprompt
             window.addEventListener('beforeinstallprompt', (e) => {
