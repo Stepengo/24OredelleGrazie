@@ -970,9 +970,11 @@ Squadra A, Luigi Verdi, 7"></textarea>
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                            <h5>gol</h5><br> 
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+                                            <h5>scalpi</h5><br> 
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
@@ -994,9 +996,11 @@ Squadra A, Luigi Verdi, 7"></textarea>
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                            <h5>gol</h5><br> 
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+                                            <h5>scalpi</h5><br> 
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
