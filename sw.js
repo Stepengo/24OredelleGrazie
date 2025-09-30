@@ -1,8 +1,10 @@
-const CACHE_NAME = '24OdG-v1.0.0';
+const CACHE_NAME = '24odg-v1';
+const BASE_PATH = '/24OredelleGrazie/';
 const urlsToCache = [
-  'https://stepengo.github.io/24OredelleGrazie/',
-  'https://stepengo.github.io/24OredelleGrazie/index.html',
-  'https://stepengo.github.io/24OredelleGrazie/manifest.json'
+  BASE_PATH,
+  BASE_PATH + 'index.html',
+  BASE_PATH + 'manifest.json',
+  BASE_PATH + 'icon-192x192.png'
 ];
 
 // Installa il service worker
