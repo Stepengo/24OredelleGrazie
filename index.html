@@ -626,7 +626,20 @@ Squadra A, Luigi Verdi, 7"></textarea>
     </div>
 
     <script>
-
+// REGISTRAZIONE SERVICE WORKER - da mettere DOPO il tag <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/24OredelleGrazie/sw.js', {
+      scope: '/24OredelleGrazie/'
+    })
+    .then(function(registration) {
+      console.log('✅ Service Worker registrato:', registration.scope);
+    })
+    .catch(function(error) {
+      console.error('❌ Errore Service Worker:', error);
+    });
+  });
+}
         
         // Strutture dati
         let teams = JSON.parse(localStorage.getItem('pallascout_teams') || '[]');
@@ -2299,56 +2312,46 @@ Squadra C\tRoberto Viola\t6`;
         let deferredPrompt;
         let isStandalone = false;
 
-        function initializePWA() {
-            // Controlla se già installata
-            isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-            
-            // Registra Service Worker
-           if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./sw.js')
-    .then(function(registration) {
-      console.log('Service Worker registrato:', registration);
-    })
-    .catch(function(error) {
-      console.log('Errore registrazione:', error);
+function initializePWA() {
+    // Controlla se già installata
+    isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
+
+    // Gestisci beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallBanner();
     });
+
+    // Gestisci installazione completata
+    window.addEventListener('appinstalled', () => {
+        hideInstallBanner();
+        console.log('PWA installata con successo');
+        showNotification('✅ App installata con successo!');
+    });
+
+    // Gestisci online/offline
+    window.addEventListener('online', () => {
+        document.getElementById('offlineIndicator').classList.remove('show');
+        showNotification('🌐 Connessione ripristinata');
+    });
+
+     window.addEventListener('offline', () => {
+        document.getElementById('offlineIndicator').classList.add('show');
+        showNotification('📡 Modalità offline attivata');
+    });
+
+    // Event listeners per install banner
+    document.getElementById('installBtn').addEventListener('click', installApp);
+    document.getElementById('dismissBtn').addEventListener('click', hideInstallBanner);
+
+    // Nascondi banner se già installata
+    if (isStandalone) {
+        hideInstallBanner();
+    }
 }
 
-            // Gestisci beforeinstallprompt
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                showInstallBanner();
-            });
-
-            // Gestisci installazione completata
-            window.addEventListener('appinstalled', () => {
-                hideInstallBanner();
-                console.log('PWA installata con successo');
-                showNotification('✅ App installata con successo!');
-            });
-
-            // Gestisci online/offline
-            window.addEventListener('online', () => {
-                document.getElementById('offlineIndicator').classList.remove('show');
-                showNotification('🌐 Connessione ripristinata');
-            });
-
-            window.addEventListener('offline', () => {
-                document.getElementById('offlineIndicator').classList.add('show');
-                showNotification('📡 Modalità offline attivata');
-            });
-
-            // Event listeners per install banner
-            document.getElementById('installBtn').addEventListener('click', installApp);
-            document.getElementById('dismissBtn').addEventListener('click', hideInstallBanner);
-
-            // Nascondi banner se già installata
-            if (isStandalone) {
-                hideInstallBanner();
-            }
-        }
-
+        
         function showInstallBanner() {
             if (!isStandalone) {
                 document.getElementById('installBanner').classList.add('show');
