@@ -10,7 +10,7 @@
     <meta name="description" content="App per gestire tornei di pallascout con arbitri, squadre e statistiche">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <meta name="apple-mobile-web-app-title" content="Pallascout">
+    <meta name="apple-mobile-web-app-title" content="24OdG">
     
     <!-- PWA Manifest -->
     <link rel="manifest" href="manifest.json">
@@ -398,7 +398,7 @@
         </div>
 
         <div class="header">
-            <h1>🏆 Torneo Pallascout</h1>
+            <h1>🏆 24 Ore delle Grazie</h1>
             <div class="nav-tabs">
                 <button class="nav-tab active" onclick="showTab('teams')">Squadre</button>
                 <button class="nav-tab" onclick="showTab('matches')">Partite</button>
@@ -626,6 +626,21 @@ Squadra A, Luigi Verdi, 7"></textarea>
     </div>
 
     <script>
+// REGISTRAZIONE SERVICE WORKER - da mettere DOPO il tag <script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function() {
+    navigator.serviceWorker.register('/24OredelleGrazie/sw.js', {
+      scope: '/24OredelleGrazie/'
+    })
+    .then(function(registration) {
+      console.log('✅ Service Worker registrato:', registration.scope);
+    })
+    .catch(function(error) {
+      console.error('❌ Errore Service Worker:', error);
+    });
+  });
+}
+        
         // Strutture dati
         let teams = JSON.parse(localStorage.getItem('pallascout_teams') || '[]');
         let matches = JSON.parse(localStorage.getItem('pallascout_matches') || '[]');
@@ -793,15 +808,10 @@ Squadra A, Luigi Verdi, 7"></textarea>
         function createMatch() {
             const homeTeamId = parseInt(document.getElementById('homeTeam').value);
             const awayTeamId = parseInt(document.getElementById('awayTeam').value);
-            const field = document.getElementById('matchField').value;
+            const field = document.getElementById('matchField').value.trim();
 
             if (!homeTeamId || !awayTeamId || homeTeamId === awayTeamId) {
                 alert('Seleziona due squadre diverse');
-                return;
-            }
-
-            if (!field) {
-                alert('Seleziona un campo per la partita');
                 return;
             }
 
@@ -809,7 +819,7 @@ Squadra A, Luigi Verdi, 7"></textarea>
                 id: Date.now(),
                 homeTeamId,
                 awayTeamId,
-                field: field,
+                field: field || 'Campo TBD',
                 status: 'scheduled', // scheduled, in_progress, completed
                 homeScore: 0,
                 awayScore: 0,
@@ -975,16 +985,18 @@ Squadra A, Luigi Verdi, 7"></textarea>
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                            <h5>gol</h5><br> 
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+                                            <h5>scalpi</h5><br> 
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
                                             <label style="display: flex; align-items: center; justify-content: center;">
                                                 <input type="radio" name="homeMVP" value="${player.id}" 
                                                        ${match.homeMVP === player.id ? 'checked' : ''}
-                                                       onchange="updateMVP(${match.id}, 'home', ${player.id})"> MVP
+                                                       onchange="updateMVP(${match.id}, 'home', ${player.id})"> 🏆MVP
                                             </label>
                                         </div>
                                     </div>
@@ -999,16 +1011,18 @@ Squadra A, Luigi Verdi, 7"></textarea>
                                     <div class="player-stats">
                                         <strong>#${player.number} ${player.name}</strong>
                                         <div class="stats-input" style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-top: 10px;">
+                                            <h5>gol</h5><br> 
                                             <input type="number" placeholder="Gol" min="0" 
                                                    value="${match.playerStats[player.id]?.goals || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'goals', this.value)">
+                                            <h5>scalpi</h5><br> 
                                             <input type="number" placeholder="Scalpi" min="0" 
                                                    value="${match.playerStats[player.id]?.scalps || 0}"
                                                    onchange="updatePlayerStat(${match.id}, ${player.id}, 'scalps', this.value)">
                                             <label style="display: flex; align-items: center; justify-content: center;">
                                                 <input type="radio" name="awayMVP" value="${player.id}" 
                                                        ${match.awayMVP === player.id ? 'checked' : ''}
-                                                       onchange="updateMVP(${match.id}, 'away', ${player.id})"> MVP
+                                                       onchange="updateMVP(${match.id}, 'away', ${player.id})"> 🏆MVP
                                             </label>
                                         </div>
                                     </div>
@@ -1144,7 +1158,7 @@ Squadra A, Luigi Verdi, 7"></textarea>
                     <p>Campo: ${match.field}</p>
                     
                     <div style="margin: 20px 0;">
-                        <h4>Invia i risultati all'organizzatore:</h4>
+                        <h4>Invia i risultati all organizzatore:</h4>
                         <div style="display: grid; gap: 10px; margin-top: 15px;">
                             <button class="btn btn-success" onclick="sendMatchByWhatsApp(${match.id})" style="background: #25D366;">
                                 📱 Invia via WhatsApp
@@ -1170,23 +1184,22 @@ Squadra A, Luigi Verdi, 7"></textarea>
             const report = generateMatchReport(matchId);
             const encodedReport = encodeURIComponent(report);
             
-            // NUMERO WHATSAPP ORGANIZZATORE PREIMPOSTATO
-            // Modifica questo numero con il tuo numero WhatsApp (con prefisso internazionale)
-            const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
-            
-            const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
-            const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
-            
-            try {
-                window.open(whatsappLink, '_blank');
-                showNotification('✅ WhatsApp aperto! Report pronto per l\'invio.');
-                closeMatchCompletedModal();
-            } catch (error) {
-                alert('Errore WhatsApp: ' + error.message + '\n\nUsa "Copia Dati negli Appunti" come alternativa.');
-                copyMatchData(matchId);
-            }
-        }
+// NUMERO WHATSAPP ORGANIZZATORE PREIMPOSTATO
+// Modifica questo numero con il tuo numero WhatsApp (con prefisso internazionale)
+const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
 
+const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
+const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
+
+try {
+    window.open(whatsappLink, '_blank');
+    showNotification('✅ WhatsApp aperto! Report pronto per l\'invio.');
+    closeMatchCompletedModal();
+} catch (error) {
+    alert('Errore WhatsApp: ' + error.message + '\n\nUsa "Copia Dati negli Appunti" come alternativa.');
+    copyMatchData(matchId);
+}
+}
         function copyMatchData(matchId) {
             const report = generateMatchReport(matchId);
             
@@ -1279,8 +1292,7 @@ Squadra A, Luigi Verdi, 7"></textarea>
             const report = generateMatchReport(matchId);
             const encodedReport = encodeURIComponent(report);
             
-            const organizerPhone = prompt('Inserisci numero WhatsApp organizzatore (con prefisso, es: +393401234567):', '+39');
-            if (!organizerPhone || organizerPhone === '+39') return;
+const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
             
             const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
             const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
@@ -2299,54 +2311,46 @@ Squadra C\tRoberto Viola\t6`;
         let deferredPrompt;
         let isStandalone = false;
 
-        function initializePWA() {
-            // Controlla se già installata
-            isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
-            
-            // Registra Service Worker
-            if ('serviceWorker' in navigator) {
-                navigator.serviceWorker.register('/sw.js').then(function(registration) {
-                    console.log('Service Worker registrato con successo:', registration);
-                }).catch(function(error) {
-                    console.log('Registrazione Service Worker fallita:', error);
-                });
-            }
+function initializePWA() {
+    // Controlla se già installata
+    isStandalone = window.navigator.standalone || window.matchMedia('(display-mode: standalone)').matches;
 
-            // Gestisci beforeinstallprompt
-            window.addEventListener('beforeinstallprompt', (e) => {
-                e.preventDefault();
-                deferredPrompt = e;
-                showInstallBanner();
-            });
+    // Gestisci beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e;
+        showInstallBanner();
+    });
 
-            // Gestisci installazione completata
-            window.addEventListener('appinstalled', () => {
-                hideInstallBanner();
-                console.log('PWA installata con successo');
-                showNotification('✅ App installata con successo!');
-            });
+    // Gestisci installazione completata
+    window.addEventListener('appinstalled', () => {
+        hideInstallBanner();
+        console.log('PWA installata con successo');
+        showNotification('✅ App installata con successo!');
+    });
 
-            // Gestisci online/offline
-            window.addEventListener('online', () => {
-                document.getElementById('offlineIndicator').classList.remove('show');
-                showNotification('🌐 Connessione ripristinata');
-            });
+    // Gestisci online/offline
+    window.addEventListener('online', () => {
+        document.getElementById('offlineIndicator').classList.remove('show');
+        showNotification('🌐 Connessione ripristinata');
+    });
 
-            window.addEventListener('offline', () => {
-                document.getElementById('offlineIndicator').classList.add('show');
-                showNotification('📡 Modalità offline attivata');
-            });
+     window.addEventListener('offline', () => {
+        document.getElementById('offlineIndicator').classList.add('show');
+        showNotification('📡 Modalità offline attivata');
+    });
 
-            // Event listeners per install banner
-            document.getElementById('installBtn').addEventListener('click', installApp);
-            document.getElementById('dismissBtn').addEventListener('click', hideInstallBanner);
+    // Event listeners per install banner
+    document.getElementById('installBtn').addEventListener('click', installApp);
+    document.getElementById('dismissBtn').addEventListener('click', hideInstallBanner);
 
-            // Nascondi banner se già installata
-            if (isStandalone) {
-                hideInstallBanner();
-            }
-        }
+    // Nascondi banner se già installata
+    if (isStandalone) {
+        hideInstallBanner();
+    }
+}
 
+        
         function showInstallBanner() {
             if (!isStandalone) {
                 document.getElementById('installBanner').classList.add('show');
