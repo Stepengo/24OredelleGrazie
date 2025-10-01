@@ -1184,8 +1184,7 @@ if ('serviceWorker' in navigator) {
             const report = generateMatchReport(matchId);
             const encodedReport = encodeURIComponent(report);
             
-            const organizerPhone = prompt('Inserisci numero WhatsApp organizzatore (con prefisso, es: +393401234567):', '+39');
-            if (!organizerPhone || organizerPhone === '+39') return;
+            const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
             
             const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
             const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
@@ -1292,8 +1291,7 @@ if ('serviceWorker' in navigator) {
             const report = generateMatchReport(matchId);
             const encodedReport = encodeURIComponent(report);
             
-            const organizerPhone = prompt('Inserisci numero WhatsApp organizzatore (con prefisso, es: +393401234567):', '+39');
-            if (!organizerPhone || organizerPhone === '+39') return;
+            const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
             
             const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
             const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
