@@ -1184,21 +1184,21 @@ if ('serviceWorker' in navigator) {
             const report = generateMatchReport(matchId);
             const encodedReport = encodeURIComponent(report);
             
-// NUMERO WHATSAPP ORGANIZZATORE PREIMPOSTATO
-// Modifica questo numero con il tuo numero WhatsApp (con prefisso internazionale)
-const organizerPhone = '+393286903768'; // ← CAMBIA QUI CON IL TUO NUMERO
-
-const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
-const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
-
-try {
-    window.open(whatsappLink, '_blank');
-    showNotification('✅ WhatsApp aperto! Report pronto per l\'invio.');
-    closeMatchCompletedModal();
-} catch (error) {
-    alert('Errore WhatsApp: ' + error.message + '\n\nUsa "Copia Dati negli Appunti" come alternativa.');
-    copyMatchData(matchId);
-}
+            const organizerPhone = prompt('Inserisci numero WhatsApp organizzatore (con prefisso, es: +393401234567):', '+39');
+            if (!organizerPhone || organizerPhone === '+39') return;
+            
+            const cleanPhone = organizerPhone.replace(/[^0-9]/g, '');
+            const whatsappLink = `https://wa.me/${cleanPhone}?text=${encodedReport}`;
+            
+            try {
+                window.open(whatsappLink, '_blank');
+                showNotification('✅ WhatsApp aperto! Se non funziona, usa "Copia Dati negli Appunti".');
+                closeMatchCompletedModal();
+            } catch (error) {
+                alert('Errore WhatsApp: ' + error.message);
+                copyMatchData(matchId);
+            }
+        }
 
         function copyMatchData(matchId) {
             const report = generateMatchReport(matchId);
