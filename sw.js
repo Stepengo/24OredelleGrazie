@@ -1,86 +1,60 @@
-const CACHE_NAME = '24odg-v1';
-const BASE_PATH = '/24OredelleGrazie/';
+const CACHE_NAME = '24odg-v2';
+const BASE_PATH = '/24OredelleGrazie';
+
+// Lista file da cachare
 const urlsToCache = [
-  BASE_PATH,
-  BASE_PATH + 'index.html',
-  BASE_PATH + 'manifest.json',
-  BASE_PATH + 'icon-192x192.png'
+  `${BASE_PATH}/`,
+  `${BASE_PATH}/index.html`,
+  `${BASE_PATH}/manifest.json`,
+  `${BASE_PATH}/icon-192x192.png`
 ];
 
-// Installa il service worker
-self.addEventListener('install', function(event) {
+// Installazione Service Worker
+self.addEventListener('install', (event) => {
+  console.log('Service Worker: Installing...');
   event.waitUntil(
     caches.open(CACHE_NAME)
-      .then(function(cache) {
-        console.log('Cache aperta');
+      .then((cache) => {
+        console.log('Service Worker: Caching files');
         return cache.addAll(urlsToCache);
       })
+      .then(() => self.skipWaiting())
   );
 });
 
-// Intercetta le richieste di rete
-self.addEventListener('fetch', function(event) {
-  event.respondWith(
-    caches.match(event.request)
-      .then(function(response) {
-        if (response) {
-          return response;
-        }
-
-        return fetch(event.request).then(
-          function(response) {
-            if(!response || response.status !== 200 || response.type !== 'basic') {
-              return response;
-            }
-
-            var responseToCache = response.clone();
-
-            caches.open(CACHE_NAME)
-              .then(function(cache) {
-                cache.put(event.request, responseToCache);
-              });
-
-            return response;
-          }
-        );
-      })
-    );
-});
-
-// Aggiorna il service worker
-self.addEventListener('activate', function(event) {
+// Attivazione Service Worker
+self.addEventListener('activate', (event) => {
+  console.log('Service Worker: Activating...');
   event.waitUntil(
-    caches.keys().then(function(cacheNames) {
+    caches.keys().then((cacheNames) => {
       return Promise.all(
-        cacheNames.map(function(cacheName) {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Eliminando cache vecchia:', cacheName);
-            return caches.delete(cacheName);
+        cacheNames.map((cache) => {
+          if (cache !== CACHE_NAME) {
+            console.log('Service Worker: Clearing old cache');
+            return caches.delete(cache);
           }
         })
       );
-    })
+    }).then(() => self.clients.claim())
   );
 });
 
-// Gestisci messaggi dall'app
-self.addEventListener('message', function(event) {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
-
-// Notifiche push
-self.addEventListener('push', function(event) {
-  if (event.data) {
-    const options = {
-      body: event.data.text(),
-      icon: '/icon-192x192.png',
-      badge: '/badge-72x72.png'
-    };
-
-    event.waitUntil(
-      self.registration.showNotification('24 Ore delle Grazie', options)
-    );
-  }
+// Fetch - strategia Network First, fallback su Cache
+self.addEventListener('fetch', (event) => {
+  event.respondWith(
+    fetch(event.request)
+      .then((response) => {
+        // Clona la risposta
+        const responseClone = response.clone();
+        // Aggiorna la cache
+        caches.open(CACHE_NAME).then((cache) => {
+          cache.put(event.request, responseClone);
+        });
+        return response;
+      })
+      .catch(() => {
+        // Se offline, usa la cache
+        return caches.match(event.request);
+      })
+  );
 });
