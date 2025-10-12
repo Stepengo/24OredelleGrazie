@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🏆 24OredelleGrazie <br> Arbitri</title>
+    <title>Gestione Torneo - Arbitri</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
 
         // ⚠️ SOSTITUISCI QUESTI VALORI CON I TUOI DA SUPABASE
-        const SUPABASE_URL = 'https://guhlnzwxadkktizeebji.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd1aGxuend4YWRra3RpemVlYmppIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAxODY3MzMsImV4cCI6MjA3NTc2MjczM30.2DAJu1IW4y2e3aRAygqwyOJNoG7KvYQummlUOw7VRa4';
+        const SUPABASE_URL = 'https://TUO-PROGETTO.supabase.co';
+        const SUPABASE_KEY = 'TUA_ANON_KEY_QUI';
 
         let supabase = null;
         let isConfigured = false;
@@ -25,8 +25,10 @@
             partite: [],
             squadre: {}, // { "Juventus": [{ numero: 7, nome: "Ronaldo" }, ...] }
             filtroSlot: 'tutti',
+            filtroCampo: 'tutti',
             connesso: false,
-            vistaCorrente: 'partite', // partite, classifica, statistiche
+            vistaCorrente: 'partite',
+            sottovistaPartite: 'tutte', // tutte, da_giocare, completate
 
             async init() {
                 this.renderNav();
@@ -50,7 +52,7 @@
                         .select('*');
 
                     if (error) {
-                        console.log('Tabella squadre non trovata, verrà creata all\'import');
+                        console.log('Tabella squadre non trovata');
                         return;
                     }
                     
@@ -72,10 +74,8 @@
             async salvaSquadre() {
                 if (!isConfigured) return;
                 try {
-                    // Svuota tabella
                     await supabase.from('squadre').delete().neq('id', 0);
                     
-                    // Inserisci nuovi dati
                     const rows = [];
                     Object.keys(this.squadre).forEach(nomeSquadra => {
                         this.squadre[nomeSquadra].forEach(giocatore => {
@@ -100,7 +100,8 @@
                     const { data, error } = await supabase
                         .from('partite')
                         .select('*')
-                        .order('slot', { ascending: true });
+                        .order('orario', { ascending: true })
+                        .order('campo', { ascending: true });
 
                     if (error) throw error;
                     this.partite = data.map(this.convertiDaDB);
@@ -138,6 +139,8 @@
                 return {
                     id: row.id,
                     slot: row.slot,
+                    campo: row.campo || 1,
+                    orario: row.orario || '',
                     squadraA: row.squadra_a,
                     squadraB: row.squadra_b,
                     golA: row.gol_a || [],
@@ -148,6 +151,8 @@
                     punteggioB: row.punteggio_b || 0,
                     puntiA: row.punti_a || 0,
                     puntiB: row.punti_b || 0,
+                    mvpA: row.mvp_a || '',
+                    mvpB: row.mvp_b || '',
                     completata: row.completata || false
                 };
             },
@@ -155,6 +160,8 @@
             convertiPerDB(partita) {
                 return {
                     slot: partita.slot,
+                    campo: partita.campo,
+                    orario: partita.orario,
                     squadra_a: partita.squadraA,
                     squadra_b: partita.squadraB,
                     gol_a: partita.golA,
@@ -165,17 +172,20 @@
                     punteggio_b: partita.punteggioB,
                     punti_a: partita.puntiA,
                     punti_b: partita.puntiB,
+                    mvp_a: partita.mvpA,
+                    mvp_b: partita.mvpB,
                     completata: partita.completata
                 };
             },
 
-            async aggiungiPartita(slot, squadraA, squadraB) {
+            async aggiungiPartita(slot, campo, orario, squadraA, squadraB) {
                 const nuova = {
-                    slot, squadraA, squadraB,
+                    slot, campo, orario, squadraA, squadraB,
                     golA: [], golB: [],
                     scalpiA: [], scalpiB: [],
                     punteggioA: 0, punteggioB: 0,
                     puntiA: 0, puntiB: 0,
+                    mvpA: '', mvpB: '',
                     completata: false
                 };
 
@@ -213,10 +223,9 @@
             },
 
             importaDaGoogleSheets() {
-                const url = prompt('Incolla il link pubblico del Google Sheets (File > Condividi > Ottieni link > Chiunque abbia il link può visualizzare):\n\nIl foglio deve avere 3 colonne: Squadra, Numero, Nome');
+                const url = prompt('Incolla il link pubblico del Google Sheets:\n\nIl foglio deve avere 3 colonne: Squadra, Numero, Nome');
                 if (!url) return;
 
-                // Converti URL Google Sheets in CSV export
                 let csvUrl = url;
                 if (url.includes('/edit')) {
                     const sheetId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
@@ -245,13 +254,14 @@
                                 });
                                 
                                 this.salvaSquadre();
-                                alert(`✅ Importate ${Object.keys(this.squadre).length} squadre con ${results.data.length} giocatori totali!`);
+                                alert(`✅ Importate ${Object.keys(this.squadre).length} squadre!`);
+                                this.renderHeader();
                                 this.renderForm();
                             }
                         });
                     })
                     .catch(error => {
-                        alert('❌ Errore import. Assicurati che:\n1. Il link sia pubblico\n2. Il foglio abbia colonne: Squadra, Numero, Nome');
+                        alert('❌ Errore import. Assicurati che il link sia pubblico.');
                         console.error(error);
                     });
             },
@@ -309,6 +319,7 @@
             calcolaStatistiche() {
                 const marcatori = {};
                 const scalpiatori = {};
+                const mvps = {};
                 
                 this.partite.forEach(p => {
                     ['A', 'B'].forEach(sq => {
@@ -323,6 +334,11 @@
                             const key = `${giocatore} (${squadra})`;
                             scalpiatori[key] = (scalpiatori[key] || 0) + 1;
                         });
+
+                        if (p[`mvp${sq}`]) {
+                            const key = `${p[`mvp${sq}`]} (${squadra})`;
+                            mvps[key] = (mvps[key] || 0) + 1;
+                        }
                     });
                 });
                 
@@ -332,20 +348,26 @@
                         .sort((a, b) => b.gol - a.gol),
                     scalpiatori: Object.entries(scalpiatori)
                         .map(([nome, scalpi]) => ({ nome, scalpi }))
-                        .sort((a, b) => b.scalpi - a.scalpi)
+                        .sort((a, b) => b.scalpi - a.scalpi),
+                    mvps: Object.entries(mvps)
+                        .map(([nome, volte]) => ({ nome, volte }))
+                        .sort((a, b) => b.volte - a.volte)
                 };
             },
 
             renderNav() {
                 document.getElementById('nav').innerHTML = `
-                    <div class="flex gap-2 mb-6 overflow-x-auto">
-                        <button data-vista="partite" class="px-4 py-2 rounded font-semibold ${this.vistaCorrente === 'partite' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
+                        <button data-vista="partite" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'partite' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
                             📋 Partite
                         </button>
-                        <button data-vista="classifica" class="px-4 py-2 rounded font-semibold ${this.vistaCorrente === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                        <button data-vista="squadre" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'squadre' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                            👥 Squadre
+                        </button>
+                        <button data-vista="classifica" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
                             🏆 Classifica
                         </button>
-                        <button data-vista="statistiche" class="px-4 py-2 rounded font-semibold ${this.vistaCorrente === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                        <button data-vista="statistiche" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
                             📊 Statistiche
                         </button>
                     </div>
@@ -373,7 +395,7 @@
                         <h1 class="text-3xl font-bold text-cyan-400">Gestione Torneo</h1>
                         ${statusHtml}
                     </div>
-                    ${!isConfigured ? '<div class="bg-yellow-900 border border-yellow-700 text-yellow-300 p-3 rounded-lg mb-4 text-sm">⚠️ <strong>Modalità Offline:</strong> Configura Supabase per sincronizzare i dati</div>' : ''}
+                    ${!isConfigured ? '<div class="bg-yellow-900 border border-yellow-700 text-yellow-300 p-3 rounded-lg mb-4 text-sm">⚠️ <strong>Modalità Offline:</strong> Configura Supabase</div>' : ''}
                     <p class="text-center text-gray-400">
                         Partite: ${this.partite.length} | Completate: ${completate} | Squadre: ${Object.keys(this.squadre).length}
                     </p>
@@ -383,18 +405,28 @@
             renderForm() {
                 const squadreDisponibili = Object.keys(this.squadre).sort();
                 
+                if (this.vistaCorrente !== 'partite') {
+                    document.getElementById('form').innerHTML = '';
+                    return;
+                }
+
                 document.getElementById('form').innerHTML = `
                     <div class="bg-gray-800 rounded-lg p-6 mb-6 shadow-xl border border-gray-700">
-                        <div class="flex justify-between items-center mb-4">
-                            <h2 class="text-xl font-semibold text-cyan-400">Nuova Partita</h2>
-                            <button id="btnImport" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold text-sm">
-                                📥 Import da Google Sheets
-                            </button>
-                        </div>
-                        <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                        <h2 class="text-xl font-semibold mb-4 text-cyan-400">Nuova Partita</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-6 gap-4">
                             <div>
                                 <label class="block text-sm mb-2 text-gray-300">Slot</label>
                                 <input type="number" id="slot" value="1" min="1" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Campo</label>
+                                <select id="campo" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                    ${[1,2,3,4,5,6,7,8].map(c => `<option value="${c}">${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Orario</label>
+                                <input type="time" id="orario" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
                             </div>
                             <div>
                                 <label class="block text-sm mb-2 text-gray-300">Squadra A</label>
@@ -425,17 +457,17 @@
                             </div>
                         </div>
                     </div>
-                    <div id="filtro" class="mb-6"></div>
                 `;
 
-                document.getElementById('btnImport').onclick = () => this.importaDaGoogleSheets();
                 document.getElementById('btnAggiungi').onclick = () => {
                     const slot = parseInt(document.getElementById('slot').value);
+                    const campo = parseInt(document.getElementById('campo').value);
+                    const orario = document.getElementById('orario').value;
                     const squadraA = document.getElementById('squadraA').value.trim();
                     const squadraB = document.getElementById('squadraB').value.trim();
                     
                     if (squadraA && squadraB) {
-                        this.aggiungiPartita(slot, squadraA, squadraB);
+                        this.aggiungiPartita(slot, campo, orario, squadraA, squadraB);
                         if (squadreDisponibili.length > 0) {
                             document.getElementById('squadraA').value = '';
                             document.getElementById('squadraB').value = '';
@@ -443,17 +475,113 @@
                             document.getElementById('squadraA').value = '';
                             document.getElementById('squadraB').value = '';
                         }
+                        document.getElementById('orario').value = '';
                     }
                 };
             },
 
             renderContenuto() {
                 if (this.vistaCorrente === 'partite') {
+                    this.renderForm();
                     this.renderPartite();
+                } else if (this.vistaCorrente === 'squadre') {
+                    document.getElementById('form').innerHTML = '';
+                    this.renderSquadre();
                 } else if (this.vistaCorrente === 'classifica') {
+                    document.getElementById('form').innerHTML = '';
                     this.renderClassifica();
                 } else if (this.vistaCorrente === 'statistiche') {
+                    document.getElementById('form').innerHTML = '';
                     this.renderStatistiche();
+                }
+            },
+
+            renderSquadre() {
+                const squadreList = Object.keys(this.squadre).sort();
+                
+                document.getElementById('contenuto').innerHTML = `
+                    <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700 mb-6">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-cyan-400">Gestione Squadre</h2>
+                            <div class="flex gap-2">
+                                <button id="btnImportSquadre" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold text-sm">
+                                    📥 Import da Google Sheets
+                                </button>
+                                <button id="btnAggiungiSquadra" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded font-semibold text-sm">
+                                    ➕ Aggiungi Manualmente
+                                </button>
+                            </div>
+                        </div>
+
+                        ${squadreList.length === 0 ? `
+                            <div class="text-center text-gray-500 py-12">
+                                <p class="mb-4">Nessuna squadra registrata</p>
+                                <p class="text-sm">Importa da Google Sheets o aggiungi manualmente</p>
+                            </div>
+                        ` : `
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                ${squadreList.map(nome => `
+                                    <div class="bg-gray-700 rounded-lg p-4">
+                                        <div class="flex justify-between items-start mb-3">
+                                            <h3 class="font-bold text-lg text-cyan-300">${nome}</h3>
+                                            <button data-elimina-squadra="${nome}" class="text-red-400 hover:text-red-300">🗑️</button>
+                                        </div>
+                                        <div class="space-y-1 max-h-48 overflow-y-auto">
+                                            ${this.squadre[nome].map(g => `
+                                                <div class="text-sm bg-gray-600 rounded px-2 py-1">
+                                                    <span class="font-semibold text-cyan-400">${g.numero}</span> - ${g.nome}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="mt-2 text-xs text-gray-400">${this.squadre[nome].length} giocatori</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
+
+                document.getElementById('btnImportSquadre').onclick = () => this.importaDaGoogleSheets();
+                document.getElementById('btnAggiungiSquadra').onclick = () => this.aggiungiSquadraManuale();
+
+                squadreList.forEach(nome => {
+                    const btn = document.querySelector(`[data-elimina-squadra="${nome}"]`);
+                    if (btn) btn.onclick = () => {
+                        if (confirm(`Eliminare la squadra "${nome}"?`)) {
+                            delete this.squadre[nome];
+                            this.salvaSquadre();
+                            this.renderSquadre();
+                            this.renderHeader();
+                        }
+                    };
+                });
+            },
+
+            aggiungiSquadraManuale() {
+                const nome = prompt('Nome della squadra:');
+                if (!nome) return;
+
+                const giocatori = [];
+                let continua = true;
+
+                while (continua) {
+                    const numero = prompt(`Squadra: ${nome}\nNumero maglia giocatore (lascia vuoto per terminare):`);
+                    if (!numero) break;
+
+                    const nomeGiocatore = prompt(`Squadra: ${nome}\nNome del giocatore n. ${numero}:`);
+                    if (!nomeGiocatore) break;
+
+                    giocatori.push({ numero: parseInt(numero), nome: nomeGiocatore });
+
+                    continua = confirm('Aggiungere un altro giocatore?');
+                }
+
+                if (giocatori.length > 0) {
+                    this.squadre[nome] = giocatori;
+                    this.salvaSquadre();
+                    this.renderSquadre();
+                    this.renderHeader();
+                    alert(`✅ Squadra "${nome}" aggiunta con ${giocatori.length} giocatori!`);
                 }
             },
 
@@ -510,7 +638,6 @@
                 
                 document.getElementById('contenuto').innerHTML = `
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <!-- Classifica Marcatori -->
                         <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
                             <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
                                 🏆 Classifica Marcatori
@@ -530,7 +657,6 @@
                             `}
                         </div>
 
-                        <!-- Classifica Scalpi -->
                         <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
                             <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
                                 🎯 Classifica Scalpi
@@ -549,47 +675,153 @@
                                 </div>
                             `}
                         </div>
+
+                        <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                            <h2 class="text-xl font-semibold mb-4 text-cyan-400 flex items-center gap-2">
+                                ⭐ MVP del Torneo
+                            </h2>
+                            ${stats.mvps.length === 0 ? '<p class="text-gray-500">Nessun MVP assegnato</p>' : `
+                                <div class="space-y-2">
+                                    ${stats.mvps.slice(0, 10).map((m, i) => `
+                                        <div class="flex justify-between items-center bg-gray-700 rounded px-4 py-3">
+                                            <div class="flex items-center gap-3">
+                                                <span class="font-bold ${i === 0 ? 'text-yellow-400 text-lg' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-orange-400' : 'text-gray-400'}">${i + 1}</span>
+                                                <span class="text-white">${m.nome}</span>
+                                            </div>
+                                            <span class="bg-purple-900 text-purple-300 px-3 py-1 rounded-full font-bold">${m.volte}x</span>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                            `}
+                        </div>
                     </div>
                 `;
             },
 
             renderPartite() {
-                const slots = [...new Set(this.partite.map(p => p.slot))].sort((a, b) => a - b);
-                
-                if (slots.length > 0) {
-                    document.getElementById('filtro').innerHTML = `
-                        <label class="block text-sm mb-2 text-gray-300">Filtra per Slot</label>
-                        <select id="selectSlot" class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
-                            <option value="tutti">Tutti gli slot</option>
-                            ${slots.map(s => `<option value="${s}">Slot ${s}</option>`).join('')}
-                        </select>
-                    `;
-                    document.getElementById('selectSlot').value = this.filtroSlot;
-                    document.getElementById('selectSlot').onchange = (e) => {
-                        this.filtroSlot = e.target.value;
+                const daGiocare = this.partite.filter(p => !p.completata);
+                const completate = this.partite.filter(p => p.completata);
+
+                document.getElementById('contenuto').innerHTML = `
+                    <div class="mb-6 flex gap-2 overflow-x-auto pb-2">
+                        <button data-sottovista="tutte" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.sottovistaPartite === 'tutte' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                            Tutte (${this.partite.length})
+                        </button>
+                        <button data-sottovista="da_giocare" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.sottovistaPartite === 'da_giocare' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                            Da Giocare (${daGiocare.length})
+                        </button>
+                        <button data-sottovista="completate" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.sottovistaPartite === 'completate' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}">
+                            Completate (${completate.length})
+                        </button>
+                    </div>
+                    <div id="filtri"></div>
+                    <div id="listaPartite"></div>
+                `;
+
+                document.querySelectorAll('[data-sottovista]').forEach(btn => {
+                    btn.onclick = () => {
+                        this.sottovistaPartite = btn.dataset.sottovista;
                         this.renderPartite();
                     };
-                } else {
-                    document.getElementById('filtro').innerHTML = '';
+                });
+
+                this.renderFiltriPartite();
+                this.renderListaPartite();
+            },
+
+            renderFiltriPartite() {
+                let partiteFiltrate = this.partite;
+                if (this.sottovistaPartite === 'da_giocare') partiteFiltrate = this.partite.filter(p => !p.completata);
+                else if (this.sottovistaPartite === 'completate') partiteFiltrate = this.partite.filter(p => p.completata);
+
+                const slots = [...new Set(partiteFiltrate.map(p => p.slot))].sort((a, b) => a - b);
+                const campi = [...new Set(partiteFiltrate.map(p => p.campo))].sort((a, b) => a - b);
+
+                document.getElementById('filtri').innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                        ${slots.length > 0 ? `
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Filtra per Slot</label>
+                                <select id="selectSlot" class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white w-full">
+                                    <option value="tutti">Tutti gli slot</option>
+                                    ${slots.map(s => `<option value="${s}">Slot ${s}</option>`).join('')}
+                                </select>
+                            </div>
+                        ` : ''}
+                        ${campi.length > 0 ? `
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Filtra per Campo</label>
+                                <select id="selectCampo" class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white w-full">
+                                    <option value="tutti">Tutti i campi</option>
+                                    ${campi.map(c => `<option value="${c}">Campo ${c}</option>`).join('')}
+                                </select>
+                            </div>
+                        ` : ''}
+                    </div>
+                `;
+
+                if (slots.length > 0) {
+                    const selectSlot = document.getElementById('selectSlot');
+                    selectSlot.value = this.filtroSlot;
+                    selectSlot.onchange = (e) => {
+                        this.filtroSlot = e.target.value;
+                        this.renderListaPartite();
+                    };
                 }
 
-                const filtrate = this.filtroSlot === 'tutti' 
-                    ? this.partite 
-                    : this.partite.filter(p => p.slot === parseInt(this.filtroSlot));
+                if (campi.length > 0) {
+                    const selectCampo = document.getElementById('selectCampo');
+                    selectCampo.value = this.filtroCampo;
+                    selectCampo.onchange = (e) => {
+                        this.filtroCampo = e.target.value;
+                        this.renderListaPartite();
+                    };
+                }
+            },
 
-                if (filtrate.length === 0) {
-                    document.getElementById('contenuto').innerHTML = '<div class="text-center text-gray-500 py-12">Nessuna partita registrata</div>';
+            renderListaPartite() {
+                let partite = this.partite;
+                
+                if (this.sottovistaPartite === 'da_giocare') partite = partite.filter(p => !p.completata);
+                else if (this.sottovistaPartite === 'completate') partite = partite.filter(p => p.completata);
+
+                if (this.filtroSlot !== 'tutti') partite = partite.filter(p => p.slot === parseInt(this.filtroSlot));
+                if (this.filtroCampo !== 'tutti') partite = partite.filter(p => p.campo === parseInt(this.filtroCampo));
+
+                // Raggruppa per orario e campo
+                const raggruppate = {};
+                partite.forEach(p => {
+                    const chiave = `${p.orario || 'Nessun orario'}_Campo ${p.campo}`;
+                    if (!raggruppate[chiave]) raggruppate[chiave] = [];
+                    raggruppate[chiave].push(p);
+                });
+
+                if (Object.keys(raggruppate).length === 0) {
+                    document.getElementById('listaPartite').innerHTML = '<div class="text-center text-gray-500 py-12">Nessuna partita</div>';
                     return;
                 }
 
-                document.getElementById('contenuto').innerHTML = filtrate.map(p => this.renderPartita(p)).join('');
-                
-                filtrate.forEach(p => this.attachEventHandlers(p));
+                document.getElementById('listaPartite').innerHTML = Object.keys(raggruppate).sort().map(chiave => {
+                    const [orario, campo] = chiave.split('_');
+                    return `
+                        <div class="mb-6">
+                            <div class="bg-gray-700 px-4 py-2 rounded-t-lg flex justify-between items-center">
+                                <div class="font-semibold text-cyan-300">⏰ ${orario} - 🏟️ ${campo}</div>
+                                <div class="text-sm text-gray-400">${raggruppate[chiave].length} partite</div>
+                            </div>
+                            <div class="space-y-4 mt-2">
+                                ${raggruppate[chiave].map(p => this.renderPartita(p)).join('')}
+                            </div>
+                        </div>
+                    `;
+                }).join('');
+
+                partite.forEach(p => this.attachEventHandlers(p));
             },
 
             renderPartita(p) {
                 return `
-                    <div class="bg-gray-800 rounded-lg p-6 shadow-xl border ${p.completata ? 'border-green-600' : 'border-gray-700'} mb-6">
+                    <div class="bg-gray-800 rounded-lg p-6 shadow-xl border ${p.completata ? 'border-green-600' : 'border-gray-700'}">
                         <div class="flex justify-between items-start mb-4">
                             <div>
                                 <span class="bg-cyan-900 text-cyan-300 px-3 py-1 rounded-full text-sm font-semibold">Slot ${p.slot}</span>
@@ -599,41 +831,55 @@
                         </div>
                         
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            ${this.renderSquadra(p, 'A')}
-                            ${this.renderSquadra(p, 'B')}
+                            ${this.renderSquadraPartita(p, 'A')}
+                            ${this.renderSquadraPartita(p, 'B')}
                         </div>
                         
                         ${!p.completata ? `
                             <div class="mt-6 pt-6 border-t border-gray-700">
-                                <h3 class="text-lg font-semibold mb-4 text-cyan-400">Punteggio Finale</h3>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                                <h3 class="text-lg font-semibold mb-4 text-cyan-400">Finalizza Partita</h3>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-4">
                                     <div>
-                                        <label class="block text-sm mb-2 text-gray-300">${p.squadraA}</label>
-                                        <input type="number" id="punti-a-${p.id}" value="${p.punteggioA}" min="0" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                        <label class="block text-sm mb-2 text-gray-300">MVP ${p.squadraA}</label>
+                                        ${this.squadre[p.squadraA] ? `
+                                            <select id="mvp-a-${p.id}" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                                <option value="">-- Seleziona MVP --</option>
+                                                ${this.squadre[p.squadraA].map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
+                                            </select>
+                                        ` : `
+                                            <input type="text" id="mvp-a-${p.id}" placeholder="Nome giocatore" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                        `}
                                     </div>
                                     <div>
-                                        <label class="block text-sm mb-2 text-gray-300">${p.squadraB}</label>
-                                        <input type="number" id="punti-b-${p.id}" value="${p.punteggioB}" min="0" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
-                                    </div>
-                                    <div class="flex items-end">
-                                        <button data-finalizza="${p.id}" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 px-4 rounded">
-                                            🏆 Finalizza
-                                        </button>
+                                        <label class="block text-sm mb-2 text-gray-300">MVP ${p.squadraB}</label>
+                                        ${this.squadre[p.squadraB] ? `
+                                            <select id="mvp-b-${p.id}" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                                <option value="">-- Seleziona MVP --</option>
+                                                ${this.squadre[p.squadraB].map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
+                                            </select>
+                                        ` : `
+                                            <input type="text" id="mvp-b-${p.id}" placeholder="Nome giocatore" class="w-full bg-gray-700 border border-gray-600 rounded px-3 py-2 text-white">
+                                        `}
                                     </div>
                                 </div>
+                                <button data-finalizza="${p.id}" class="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-3 px-4 rounded">
+                                    🏆 Finalizza Partita
+                                </button>
                             </div>
                         ` : `
                             <div class="mt-6 pt-6 border-t border-gray-700">
-                                <div class="grid grid-cols-2 gap-4 text-center">
+                                <div class="grid grid-cols-2 gap-4 text-center mb-4">
                                     <div class="bg-gray-700 rounded-lg p-4">
                                         <div class="text-gray-400 text-sm mb-1">${p.squadraA}</div>
                                         <div class="text-3xl font-bold text-cyan-400">${p.punteggioA}</div>
                                         <div class="text-sm text-gray-400 mt-2">Punti: ${p.puntiA}</div>
+                                        ${p.mvpA ? `<div class="text-sm text-purple-400 mt-2">⭐ MVP: ${p.mvpA}</div>` : ''}
                                     </div>
                                     <div class="bg-gray-700 rounded-lg p-4">
                                         <div class="text-gray-400 text-sm mb-1">${p.squadraB}</div>
                                         <div class="text-3xl font-bold text-cyan-400">${p.punteggioB}</div>
                                         <div class="text-sm text-gray-400 mt-2">Punti: ${p.puntiB}</div>
+                                        ${p.mvpB ? `<div class="text-sm text-purple-400 mt-2">⭐ MVP: ${p.mvpB}</div>` : ''}
                                     </div>
                                 </div>
                             </div>
@@ -642,15 +888,19 @@
                 `;
             },
 
-            renderSquadra(p, squadra) {
+            renderSquadraPartita(p, squadra) {
                 const nome = p[`squadra${squadra}`];
                 const gol = p[`gol${squadra}`];
                 const scalpi = p[`scalpi${squadra}`];
                 const giocatori = this.squadre[nome] || [];
+                const punteggio = p[`punteggio${squadra}`];
                 
                 return `
                     <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-bold mb-4 text-cyan-300">${nome}</h3>
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-cyan-300">${nome}</h3>
+                            <div class="text-2xl font-bold text-yellow-400">${punteggio}</div>
+                        </div>
                         
                         <div class="mb-4">
                             <div class="flex items-center gap-2 mb-2">
@@ -661,11 +911,11 @@
                                 <div class="flex gap-2 mb-2">
                                     ${giocatori.length > 0 ? `
                                         <select id="gol-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
-                                            <option value="">-- Seleziona giocatore --</option>
+                                            <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome giocatore" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                     `}
                                     <button data-add-gol="${p.id}-${squadra}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
@@ -689,11 +939,11 @@
                                 <div class="flex gap-2 mb-2">
                                     ${giocatori.length > 0 ? `
                                         <select id="scalpo-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
-                                            <option value="">-- Seleziona giocatore --</option>
+                                            <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome giocatore" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                     `}
                                     <button data-add-scalpo="${p.id}-${squadra}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
@@ -712,23 +962,33 @@
             },
 
             attachEventHandlers(p) {
-                // Delete partita
                 const btnDel = document.querySelector(`[data-delete="${p.id}"]`);
                 if (btnDel) btnDel.onclick = () => this.eliminaPartita(p.id);
 
-                // Finalizza
                 const btnFin = document.querySelector(`[data-finalizza="${p.id}"]`);
                 if (btnFin) btnFin.onclick = () => {
-                    const scoreA = parseInt(document.getElementById(`punti-a-${p.id}`).value) || 0;
-                    const scoreB = parseInt(document.getElementById(`punti-b-${p.id}`).value) || 0;
+                    const mvpA = document.getElementById(`mvp-a-${p.id}`).value;
+                    const mvpB = document.getElementById(`mvp-b-${p.id}`).value;
+                    
+                    const scoreA = p.golA.length;
+                    const scoreB = p.golB.length;
                     let puntiA = 0, puntiB = 0;
+                    
                     if (scoreA > scoreB) puntiA = 3;
                     else if (scoreB > scoreA) puntiB = 3;
                     else { puntiA = 1; puntiB = 1; }
-                    this.aggiornaPartita(p.id, { punteggioA: scoreA, punteggioB: scoreB, puntiA, puntiB, completata: true });
+                    
+                    this.aggiornaPartita(p.id, { 
+                        punteggioA: scoreA, 
+                        punteggioB: scoreB, 
+                        puntiA, 
+                        puntiB, 
+                        mvpA, 
+                        mvpB, 
+                        completata: true 
+                    });
                 };
 
-                // Gol e Scalpi
                 ['A', 'B'].forEach(sq => {
                     const btnGol = document.querySelector(`[data-add-gol="${p.id}-${sq}"]`);
                     if (btnGol) btnGol.onclick = () => {
@@ -736,7 +996,11 @@
                         const valore = input.tagName === 'SELECT' ? input.value : input.value.trim();
                         if (valore) {
                             const nuoviGol = [...p[`gol${sq}`], valore];
-                            this.aggiornaPartita(p.id, { [`gol${sq}`]: nuoviGol });
+                            const nuovoPunteggio = nuoviGol.length;
+                            this.aggiornaPartita(p.id, { 
+                                [`gol${sq}`]: nuoviGol,
+                                [`punteggio${sq}`]: nuovoPunteggio
+                            });
                             input.value = '';
                         }
                     };
@@ -757,7 +1021,11 @@
                         if (btn) btn.onclick = () => {
                             const nuoviGol = [...p[`gol${sq}`]];
                             nuoviGol.splice(i, 1);
-                            this.aggiornaPartita(p.id, { [`gol${sq}`]: nuoviGol });
+                            const nuovoPunteggio = nuoviGol.length;
+                            this.aggiornaPartita(p.id, { 
+                                [`gol${sq}`]: nuoviGol,
+                                [`punteggio${sq}`]: nuovoPunteggio
+                            });
                         };
                     });
 
