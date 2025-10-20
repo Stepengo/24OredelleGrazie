@@ -1,365 +1,519 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="theme-color" content="#0e7490">
-    <meta name="description" content="App per la gestione del torneo 24 Ore di Gabicce">
-    <title>24 Ore delle Grazie - Gestione Torneo</title>
-    
-    <link rel="manifest" href="./manifest.json">
-    <link rel="icon" type="image/png" sizes="192x192" href="./icon-192.png">
-    <link rel="icon" type="image/png" sizes="512x512" href="./icon-512.png">
-    <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png">
-    <link rel="shortcut icon" href="./icon-192.png">
-    
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script type="module">
-        import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
-
-        const SUPABASE_URL = 'https://bflagmexshprrbigcjzj.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmbGFnbWV4c2hwcnJiaWdjanpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMTk3MDMsImV4cCI6MjA3NTc5NTcwM30.29WDB3dfj9a2jOjTJRT28nQcjMqEXoDdfWXTWMNJbE8';
-
-        let supabase = null;
-        let isConfigured = false;
-
-        if (SUPABASE_URL !== 'https://TUO-PROGETTO.supabase.co') {
-            supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
-            isConfigured = true;
-        }
-
-        const ARBITRI_AUTORIZZATI = ['arbitro1@24odg.it', 'arbitro2@24odg.it', 'arbitro3@24odg.it', 'arbitro4@24odg.it', 'arbitro5@24odg.it', 'arbitro6@24odg.it', 'arbitro7@24odg.it', 'arbitro8@24odg.it'];
-        const EMAIL_TEST = 'test@24odg.test';
-
-        const app = {
-            partite: [],
-            squadre: {},
-            filtroCampo: 'tutti',
-            connesso: false,
-            vistaCorrente: 'partite',
-            sottovistaPartite: 'tutte',
-            utenteAutenticato: null,
-            email: '',
-
-            async init() {
-                const emailSalvata = localStorage.getItem('24odg_email');
-                if (emailSalvata) {
-                    this.utenteAutenticato = emailSalvata;
-                    this.email = emailSalvata;
-                }
-                this.renderNav();
-                this.renderHeader();
-                if (!this.utenteAutenticato) {
-                    this.renderLogin();
-                    return;
-                }
-                if (isConfigured) {
-                    await this.caricaSquadre();
-                    await this.caricaPartite();
-                    this.sottoscriviAggiornamenti();
-                }
-                this.renderContenuto();
-            },
-
-            async login(email) {
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email)) {
-                    alert('Email non valida!');
-                    return;
-                }
-                const emailNormalizzata = email.toLowerCase().trim();
-                const emailAutorizzate = [...ARBITRI_AUTORIZZATI, EMAIL_TEST];
-                if (!emailAutorizzate.includes(emailNormalizzata)) {
-                    alert(`Email non autorizzata!\n\n"${emailNormalizzata}"\n\nContatta l'organizzatore.`);
-                    return;
-                }
-                localStorage.setItem('24odg_email', emailNormalizzata);
-                this.utenteAutenticato = emailNormalizzata;
-                this.email = emailNormalizzata;
-                alert(`Benvenuto ${emailNormalizzata}!`);
-                this.init();
-            },
-
-            logout() {
-                if (confirm('Vuoi disconnetterti?')) {
-                    localStorage.removeItem('24odg_email');
-                    this.utenteAutenticato = null;
-                    this.email = '';
-                    location.reload();
-                }
-            },
-
-            renderLogin() {
-                document.getElementById('nav').innerHTML = '';
-                document.getElementById('header').innerHTML = `<div class="flex items-center justify-center gap-3 mb-2"><h1 class="text-3xl font-bold text-cyan-400">24 Ore delle Grazie</h1></div>`;
-                document.getElementById('contenuto').innerHTML = `
-                    <div class="flex items-center justify-center min-h-96">
-                        <div class="bg-gray-800 rounded-lg p-8 shadow-xl border border-gray-700 w-full max-w-md">
-                            <h2 class="text-2xl font-bold text-center mb-2 text-cyan-400">Accedi</h2>
-                            <div class="mb-6">
-                                <label class="block text-sm mb-2 text-gray-300">Email</label>
-                                <input type="email" id="loginEmail" placeholder="arbitro@24odg.it" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white">
-                            </div>
-                            <button id="btnLogin" class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded">Accedi</button>
-                            <div class="mt-8 pt-6 border-t border-gray-700">
-                                <button id="btnTest" class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-4 rounded text-sm">Test: test@24odg.test</button>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                document.getElementById('btnLogin').onclick = () => {
-                    const email = document.getElementById('loginEmail').value.trim();
-                    if (email) this.login(email);
-                };
-                document.getElementById('btnTest').onclick = () => this.login(EMAIL_TEST);
-            },
-
-            renderNav() {
-                if (!this.utenteAutenticato) return;
-                document.getElementById('nav').innerHTML = `
-                    <div class="flex gap-2 mb-6 overflow-x-auto pb-2">
-                        <button data-vista="partite" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'partite' ? 'bg-cyan-600 text-white' : 'bg-gray-700'}">Partite</button>
-                        <button data-vista="squadre" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'squadre' ? 'bg-cyan-600 text-white' : 'bg-gray-700'}">Squadre</button>
-                        <button data-vista="classifica" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700'}">Classifica</button>
-                        <button data-vista="statistiche" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vistaCorrente === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700'}">Statistiche</button>
-                        <button id="btnLogout" class="px-4 py-2 rounded font-semibold whitespace-nowrap bg-red-900 ml-auto">Esci</button>
-                    </div>
-                `;
-                document.querySelectorAll('[data-vista]').forEach(btn => {
-                    btn.onclick = () => {
-                        this.vistaCorrente = btn.dataset.vista;
-                        this.renderNav();
-                        this.renderContenuto();
-                    };
-                });
-                document.getElementById('btnLogout').onclick = () => this.logout();
-            },
-
-            renderHeader() {
-                if (!this.utenteAutenticato) return;
-                const completate = this.partite.filter(p => p.completata).length;
-                document.getElementById('header').innerHTML = `
-                    <div class="flex items-center justify-between mb-2">
-                        <h1 class="text-3xl font-bold text-cyan-400">24 Ore delle Grazie</h1>
-                        <div class="text-sm text-gray-400">${this.email}</div>
-                    </div>
-                    <p class="text-center text-gray-400">Partite: ${this.partite.length} | Completate: ${completate}</p>
-                `;
-            },
-
-            async caricaSquadre() {
-                if (!isConfigured) return;
-                try {
-                    const { data } = await supabase.from('squadre').select('*');
-                    this.squadre = {};
-                    data.forEach(row => {
-                        if (!this.squadre[row.nome_squadra]) this.squadre[row.nome_squadra] = [];
-                        this.squadre[row.nome_squadra].push({ numero: row.numero, nome: row.nome_giocatore });
-                    });
-                } catch (e) { console.error(e); }
-            },
-
-            async caricaPartite() {
-                try {
-                    const { data } = await supabase.from('partite').select('*').order('orario', { ascending: true });
-                    this.partite = data.map(r => ({
-                        id: r.id, campo: r.campo || 1, orario: r.orario || '',
-                        squadraA: r.squadra_a, squadraB: r.squadra_b,
-                        golA: r.gol_a || [], golB: r.gol_b || [],
-                        scalpiA: r.scalpi_a || [], scalpiB: r.scalpi_b || [],
-                        vuotiA: r.vuoti_a || [], vuotiB: r.vuoti_b || [],
-                        punteggioA: r.punteggio_a || 0, punteggioB: r.punteggio_b || 0,
-                        puntiA: r.punti_a || 0, puntiB: r.punti_b || 0,
-                        mvpA: r.mvp_a || '', mvpB: r.mvp_b || '',
-                        completata: r.completata || false
-                    }));
-                    this.connesso = true;
-                    this.renderHeader();
-                } catch (e) { this.connesso = false; }
-            },
-
-            renderContenuto() {
-                if (this.vistaCorrente === 'partite') this.renderPartite();
-            },
-
-            renderPartite() {
-                document.getElementById('contenuto').innerHTML = `<div id="listaPartite"></div>`;
-                const html = this.partite.map(p => this.renderPartitaCard(p)).join('');
-                document.getElementById('listaPartite').innerHTML = html;
-                this.attachHandlers();
-            },
-
-            renderPartitaCard(p) {
-                return `
-                    <div class="bg-gray-800 rounded-lg p-6 mb-4 shadow-xl border border-gray-700">
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            ${this.renderSquadraForm(p, 'A')}
-                            ${this.renderSquadraForm(p, 'B')}
-                        </div>
-                    </div>
-                `;
-            },
-
-            renderSquadraForm(p, sq) {
-                const nome = p[`squadra${sq}`];
-                const gol = p[`gol${sq}`];
-                const scalpi = p[`scalpi${sq}`];
-                const vuoti = p[`vuoti${sq}`] || [];
-                const giocatori = this.squadre[nome] || [];
-                
-                return `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <h3 class="text-lg font-bold text-cyan-300 mb-4">${nome}</h3>
-                        
-                        <div class="mb-4">
-                            <label class="block text-sm font-semibold mb-2 text-gray-200">Gol (${gol.length})</label>
-                            <div class="flex gap-2 mb-2">
-                                <select id="gol-${sq}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
-                                    <option value="">Seleziona giocatore</option>
-                                    ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
-                                </select>
-                                <button data-add-gol="${p.id}-${sq}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">+</button>
-                            </div>
-                            <div class="space-y-1">
-                                ${gol.map((g, i) => `<div class="flex justify-between bg-gray-600 rounded px-3 py-2 text-sm"><span>${g}</span><button data-del-gol="${p.id}-${sq}-${i}" class="text-red-400">✕</button></div>`).join('')}
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="block text-sm font-semibold mb-2 text-gray-200">Scalpi (${scalpi.length})</label>
-                            <div class="flex gap-2 mb-2">
-                                <select id="scalpo-${sq}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
-                                    <option value="">Seleziona giocatore</option>
-                                    ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
-                                </select>
-                                <button data-add-scalpo="${p.id}-${sq}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">+</button>
-                            </div>
-                            <div class="space-y-1">
-                                ${scalpi.map((s, i) => `<div class="flex justify-between bg-gray-600 rounded px-3 py-2 text-sm"><span>${s}</span><button data-del-scalpo="${p.id}-${sq}-${i}" class="text-red-400">✕</button></div>`).join('')}
-                            </div>
-                        </div>
-
-                        <div class="mb-4">
-                            <label class="block text-sm font-semibold mb-2 text-gray-200">Scampi Vuoti (${vuoti.length})</label>
-                            <div class="flex gap-2 mb-2">
-                                <select id="vuoto-${sq}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
-                                    <option value="">Seleziona giocatore</option>
-                                    ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
-                                </select>
-                                <button data-add-vuoto="${p.id}-${sq}" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">+</button>
-                            </div>
-                            <div class="space-y-1">
-                                ${vuoti.map((v, i) => `<div class="flex justify-between bg-gray-600 rounded px-3 py-2 text-sm"><span>${v}</span><button data-del-vuoto="${p.id}-${sq}-${i}" class="text-red-400">✕</button></div>`).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
-
-            attachHandlers() {
-                this.partite.forEach(p => {
-                    ['A', 'B'].forEach(sq => {
-                        // GOL
-                        const addGolBtn = document.querySelector(`[data-add-gol="${p.id}-${sq}"]`);
-                        if (addGolBtn) {
-                            addGolBtn.onclick = () => {
-                                const input = document.getElementById(`gol-${sq}-${p.id}`);
-                                const valore = input.value.trim();
-                                if (valore) {
-                                    const nuoviGol = [...p[`gol${sq}`], valore];
-                                    this.aggiornaPartita(p.id, { [`gol${sq}`]: nuoviGol });
-                                    input.value = '';
-                                }
-                            };
-                        }
-
-                        // SCALPI
-                        const addScalpoBtn = document.querySelector(`[data-add-scalpo="${p.id}-${sq}"]`);
-                        if (addScalpoBtn) {
-                            addScalpoBtn.onclick = () => {
-                                const input = document.getElementById(`scalpo-${sq}-${p.id}`);
-                                const valore = input.value.trim();
-                                if (valore) {
-                                    const nuoviScalpi = [...p[`scalpi${sq}`], valore];
-                                    this.aggiornaPartita(p.id, { [`scalpi${sq}`]: nuoviScalpi });
-                                    input.value = '';
-                                }
-                            };
-                        }
-
-                        // VUOTI
-                        const addVuotoBtn = document.querySelector(`[data-add-vuoto="${p.id}-${sq}"]`);
-                        if (addVuotoBtn) {
-                            addVuotoBtn.onclick = () => {
-                                const input = document.getElementById(`vuoto-${sq}-${p.id}`);
-                                const valore = input.value.trim();
-                                if (valore) {
-                                    const nuoviVuoti = [...(p[`vuoti${sq}`] || []), valore];
-                                    this.aggiornaPartita(p.id, { [`vuoti${sq}`]: nuoviVuoti });
-                                    input.value = '';
-                                }
-                            };
-                        }
-
-                        // DELETE GOL
-                        p[`gol${sq}`].forEach((_, i) => {
-                            const btn = document.querySelector(`[data-del-gol="${p.id}-${sq}-${i}"]`);
-                            if (btn) btn.onclick = () => {
-                                const nuovi = [...p[`gol${sq}`]];
-                                nuovi.splice(i, 1);
-                                this.aggiornaPartita(p.id, { [`gol${sq}`]: nuovi });
-                            };
-                        });
-
-                        // DELETE SCALPI
-                        p[`scalpi${sq}`].forEach((_, i) => {
-                            const btn = document.querySelector(`[data-del-scalpo="${p.id}-${sq}-${i}"]`);
-                            if (btn) btn.onclick = () => {
-                                const nuovi = [...p[`scalpi${sq}`]];
-                                nuovi.splice(i, 1);
-                                this.aggiornaPartita(p.id, { [`scalpi${sq}`]: nuovi });
-                            };
-                        });
-
-                        // DELETE VUOTI
-                        (p[`vuoti${sq}`] || []).forEach((_, i) => {
-                            const btn = document.querySelector(`[data-del-vuoto="${p.id}-${sq}-${i}"]`);
-                            if (btn) btn.onclick = () => {
-                                const nuovi = [...(p[`vuoti${sq}`] || [])];
-                                nuovi.splice(i, 1);
-                                this.aggiornaPartita(p.id, { [`vuoti${sq}`]: nuovi });
-                            };
-                        });
-                    });
-                });
-            },
-
-            async aggiornaPartita(id, aggiornamenti) {
-                const idx = this.partite.findIndex(p => p.id === id);
-                if (idx !== -1) {
-                    this.partite[idx] = { ...this.partite[idx], ...aggiornamenti };
-                    if (isConfigured) {
-                        const p = this.partite[idx];
-                        await supabase.from('partite').update({
-                            gol_a: p.golA, gol_b: p.golB,
-                            scalpi_a: p.scalpiA, scalpi_b: p.scalpiB,
-                            vuoti_a: p.vuotiA, vuoti_b: p.vuotiB
-                        }).eq('id', id);
-                    }
-                    this.renderPartite();
-                }
-            }
-        };
-
-        window.addEventListener('DOMContentLoaded', () => app.init());
-    </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestione Arbitri Torneo</title>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
-<body class="bg-gray-900 text-gray-100 min-h-screen">
-    <div class="max-w-6xl mx-auto p-4">
-        <header id="header" class="mb-8"></header>
-        <div id="nav"></div>
-        <div id="contenuto"></div>
-    </div>
+<body>
+  <div id="root"></div>
+  
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // Icone come componenti SVG
+    const Plus = () => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <line x1="12" y1="5" x2="12" y2="19"></line>
+        <line x1="5" y1="12" x2="19" y2="12"></line>
+      </svg>
+    );
+
+    const Trash2 = ({ size = 18 }) => (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <polyline points="3 6 5 6 21 6"></polyline>
+        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        <line x1="10" y1="11" x2="10" y2="17"></line>
+        <line x1="14" y1="11" x2="14" y2="17"></line>
+      </svg>
+    );
+
+    const Save = () => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+        <polyline points="17 21 17 13 7 13 7 21"></polyline>
+        <polyline points="7 3 7 8 15 8"></polyline>
+      </svg>
+    );
+
+    const Download = () => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    );
+
+    const Upload = () => (
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="17 8 12 3 7 8"></polyline>
+        <line x1="12" y1="3" x2="12" y2="15"></line>
+      </svg>
+    );
+
+    function TorneoArbitri() {
+      const [slot, setSlot] = useState(1);
+      const [partite, setPartite] = useState([]);
+      const [partitaCorrente, setPartitaCorrente] = useState(null);
+
+      // Carica dati salvati
+      useEffect(() => {
+        const saved = window.torneoData;
+        if (saved) {
+          setPartite(saved.partite || []);
+          setSlot(saved.slot || 1);
+        }
+      }, []);
+
+      // Salva dati
+      const salvaDati = () => {
+        window.torneoData = { partite, slot };
+        alert('Dati salvati con successo!');
+      };
+
+      // Esporta JSON
+      const esportaDati = () => {
+        const dataStr = JSON.stringify({ partite, slot }, null, 2);
+        const dataBlob = new Blob([dataStr], { type: 'application/json' });
+        const url = URL.createObjectURL(dataBlob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `torneo_slot${slot}_${new Date().toISOString().split('T')[0]}.json`;
+        link.click();
+      };
+
+      // Importa JSON
+      const importaDati = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const data = JSON.parse(event.target.result);
+              setPartite(data.partite || []);
+              setSlot(data.slot || 1);
+              alert('Dati importati con successo!');
+            } catch (error) {
+              alert('Errore nell\'importazione del file');
+            }
+          };
+          reader.readAsText(file);
+        }
+      };
+
+      // Nuova partita
+      const nuovaPartita = () => {
+        const nuova = {
+          id: Date.now(),
+          slot,
+          squadraA: '',
+          squadraB: '',
+          golA: [],
+          golB: [],
+          scalpiA: [],
+          scalpiB: [],
+          punteggioA: 0,
+          punteggioB: 0,
+          completata: false
+        };
+        setPartite([...partite, nuova]);
+        setPartitaCorrente(nuova.id);
+      };
+
+      // Aggiorna partita
+      const aggiornaPartita = (id, campo, valore) => {
+        setPartite(partite.map(p => 
+          p.id === id ? { ...p, [campo]: valore } : p
+        ));
+      };
+
+      // Aggiungi gol/scalpo
+      const aggiungiEvento = (id, tipo, squadra) => {
+        const giocatore = prompt(`Nome giocatore per ${tipo === 'gol' ? 'GOL' : 'SCALPO'}`);
+        if (giocatore) {
+          setPartite(partite.map(p => {
+            if (p.id === id) {
+              const campo = `${tipo}${squadra}`;
+              return { ...p, [campo]: [...p[campo], giocatore] };
+            }
+            return p;
+          }));
+        }
+      };
+
+      // Rimuovi evento
+      const rimuoviEvento = (id, tipo, squadra, index) => {
+        setPartite(partite.map(p => {
+          if (p.id === id) {
+            const campo = `${tipo}${squadra}`;
+            const nuoviEventi = [...p[campo]];
+            nuoviEventi.splice(index, 1);
+            return { ...p, [campo]: nuoviEventi };
+          }
+          return p;
+        }));
+      };
+
+      // Calcola punti
+      const calcolaPunti = (partita) => {
+        const { punteggioA, punteggioB } = partita;
+        if (punteggioA > punteggioB) return { puntiA: 3, puntiB: 0 };
+        if (punteggioB > punteggioA) return { puntiA: 0, puntiB: 3 };
+        return { puntiA: 1, puntiB: 1 };
+      };
+
+      // Completa partita
+      const completaPartita = (id) => {
+        setPartite(partite.map(p => 
+          p.id === id ? { ...p, completata: true } : p
+        ));
+        setPartitaCorrente(null);
+        alert('Partita completata!');
+      };
+
+      // Elimina partita
+      const eliminaPartita = (id) => {
+        if (confirm('Eliminare questa partita?')) {
+          setPartite(partite.filter(p => p.id !== id));
+          if (partitaCorrente === id) setPartitaCorrente(null);
+        }
+      };
+
+      const partitaAttiva = partite.find(p => p.id === partitaCorrente);
+      const partiteSlot = partite.filter(p => p.slot === slot);
+
+      return (
+        <div className="min-h-screen bg-gray-900 text-gray-100 p-4">
+          <div className="max-w-4xl mx-auto">
+            {/* Header */}
+            <div className="bg-gray-800 rounded-lg p-4 mb-4 shadow-lg">
+              <h1 className="text-2xl font-bold mb-4 text-center text-blue-400">
+                Gestione Arbitri Torneo
+              </h1>
+              
+              <div className="flex flex-wrap gap-3 items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <label className="text-sm font-medium">Slot:</label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={slot}
+                    onChange={(e) => setSlot(parseInt(e.target.value) || 1)}
+                    className="w-20 px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                
+                <div className="flex gap-2 flex-wrap">
+                  <button
+                    onClick={nuovaPartita}
+                    className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg transition"
+                  >
+                    <Plus />
+                    Nuova Partita
+                  </button>
+                  
+                  <button
+                    onClick={salvaDati}
+                    className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg transition"
+                  >
+                    <Save />
+                    Salva
+                  </button>
+                  
+                  <button
+                    onClick={esportaDati}
+                    className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg transition"
+                  >
+                    <Download />
+                    Esporta
+                  </button>
+                  
+                  <label className="flex items-center gap-2 px-4 py-2 bg-yellow-600 hover:bg-yellow-700 rounded-lg transition cursor-pointer">
+                    <Upload />
+                    Importa
+                    <input
+                      type="file"
+                      accept=".json"
+                      onChange={importaDati}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            {/* Vista Partita Attiva */}
+            {partitaAttiva && !partitaAttiva.completata && (
+              <div className="bg-gray-800 rounded-lg p-4 mb-4 shadow-lg">
+                <h2 className="text-xl font-bold mb-4 text-blue-400">
+                  Partita in Corso - Slot {partitaAttiva.slot}
+                </h2>
+                
+                <div className="grid md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Squadra A</label>
+                    <input
+                      type="text"
+                      value={partitaAttiva.squadraA}
+                      onChange={(e) => aggiornaPartita(partitaAttiva.id, 'squadraA', e.target.value)}
+                      placeholder="Nome squadra A"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium mb-2">Squadra B</label>
+                    <input
+                      type="text"
+                      value={partitaAttiva.squadraB}
+                      onChange={(e) => aggiornaPartita(partitaAttiva.id, 'squadraB', e.target.value)}
+                      placeholder="Nome squadra B"
+                      className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  {/* Squadra A */}
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <h3 className="font-bold mb-3 text-green-400">
+                      {partitaAttiva.squadraA || 'Squadra A'}
+                    </h3>
+                    
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">Gol</span>
+                        <button
+                          onClick={() => aggiungiEvento(partitaAttiva.id, 'gol', 'A')}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm"
+                        >
+                          + Gol
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {partitaAttiva.golA.map((g, i) => (
+                          <div key={i} className="flex justify-between items-center bg-gray-600 px-2 py-1 rounded">
+                            <span className="text-sm">{g}</span>
+                            <button
+                              onClick={() => rimuoviEvento(partitaAttiva.id, 'gol', 'A', i)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">Scalpi</span>
+                        <button
+                          onClick={() => aggiungiEvento(partitaAttiva.id, 'scalpi', 'A')}
+                          className="px-3 py-1 bg-orange-600 hover:bg-orange-700 rounded text-sm"
+                        >
+                          + Scalpo
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {partitaAttiva.scalpiA.map((s, i) => (
+                          <div key={i} className="flex justify-between items-center bg-gray-600 px-2 py-1 rounded">
+                            <span className="text-sm">{s}</span>
+                            <button
+                              onClick={() => rimuoviEvento(partitaAttiva.id, 'scalpi', 'A', i)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Punteggio Finale</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={partitaAttiva.punteggioA}
+                        onChange={(e) => aggiornaPartita(partitaAttiva.id, 'punteggioA', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:outline-none focus:border-green-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Squadra B */}
+                  <div className="bg-gray-700 rounded-lg p-4">
+                    <h3 className="font-bold mb-3 text-blue-400">
+                      {partitaAttiva.squadraB || 'Squadra B'}
+                    </h3>
+                    
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">Gol</span>
+                        <button
+                          onClick={() => aggiungiEvento(partitaAttiva.id, 'gol', 'B')}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 rounded text-sm"
+                        >
+                          + Gol
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {partitaAttiva.golB.map((g, i) => (
+                          <div key={i} className="flex justify-between items-center bg-gray-600 px-2 py-1 rounded">
+                            <span className="text-sm">{g}</span>
+                            <button
+                              onClick={() => rimuoviEvento(partitaAttiva.id, 'gol', 'B', i)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="mb-4">
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="font-medium">Scalpi</span>
+                        <button
+                          onClick={() => aggiungiEvento(partitaAttiva.id, 'scalpi', 'B')}
+                          className="px-3 py-1 bg-orange-600 hover:bg-orange-700 rounded text-sm"
+                        >
+                          + Scalpo
+                        </button>
+                      </div>
+                      <div className="space-y-1">
+                        {partitaAttiva.scalpiB.map((s, i) => (
+                          <div key={i} className="flex justify-between items-center bg-gray-600 px-2 py-1 rounded">
+                            <span className="text-sm">{s}</span>
+                            <button
+                              onClick={() => rimuoviEvento(partitaAttiva.id, 'scalpi', 'B', i)}
+                              className="text-red-400 hover:text-red-300"
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-2">Punteggio Finale</label>
+                      <input
+                        type="number"
+                        min="0"
+                        value={partitaAttiva.punteggioB}
+                        onChange={(e) => aggiornaPartita(partitaAttiva.id, 'punteggioB', parseInt(e.target.value) || 0)}
+                        className="w-full px-3 py-2 bg-gray-600 border border-gray-500 rounded-lg focus:outline-none focus:border-blue-500"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="mt-4 flex justify-between items-center">
+                  <div className="text-lg font-bold">
+                    {(() => {
+                      const { puntiA, puntiB } = calcolaPunti(partitaAttiva);
+                      return (
+                        <span>
+                          Punti: <span className="text-green-400">{puntiA}</span> - <span className="text-blue-400">{puntiB}</span>
+                        </span>
+                      );
+                    })()}
+                  </div>
+                  
+                  <button
+                    onClick={() => completaPartita(partitaAttiva.id)}
+                    className="px-6 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium"
+                  >
+                    Completa Partita
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Lista Partite */}
+            <div className="bg-gray-800 rounded-lg p-4 shadow-lg">
+              <h2 className="text-xl font-bold mb-4 text-blue-400">
+                Partite Slot {slot} ({partiteSlot.length}/8)
+              </h2>
+              
+              {partiteSlot.length === 0 ? (
+                <p className="text-gray-400 text-center py-8">
+                  Nessuna partita in questo slot. Clicca "Nuova Partita" per iniziare.
+                </p>
+              ) : (
+                <div className="space-y-3">
+                  {partiteSlot.map((p) => {
+                    const { puntiA, puntiB } = calcolaPunti(p);
+                    return (
+                      <div
+                        key={p.id}
+                        className={`bg-gray-700 rounded-lg p-3 ${
+                          p.id === partitaCorrente ? 'border-2 border-blue-500' : ''
+                        }`}
+                      >
+                        <div className="flex justify-between items-center mb-2">
+                          <div className="flex-1">
+                            <div className="flex justify-between items-center mb-1">
+                              <span className="font-medium">
+                                {p.squadraA || 'Squadra A'}
+                              </span>
+                              <span className="font-bold text-xl">{p.punteggioA}</span>
+                            </div>
+                            <div className="flex justify-between items-center">
+                              <span className="font-medium">
+                                {p.squadraB || 'Squadra B'}
+                              </span>
+                              <span className="font-bold text-xl">{p.punteggioB}</span>
+                            </div>
+                          </div>
+                          
+                          <div className="ml-4 text-right">
+                            <div className="text-sm text-gray-400 mb-1">
+                              Punti: {puntiA} - {puntiB}
+                            </div>
+                            <div className="flex gap-2">
+                              {!p.completata && (
+                                <button
+                                  onClick={() => setPartitaCorrente(p.id)}
+                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-sm"
+                                >
+                                  Modifica
+                                </button>
+                              )}
+                              <button
+                                onClick={() => eliminaPartita(p.id)}
+                                className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-sm"
+                              >
+                                Elimina
+                              </button>
+                            </div>
+                            {p.completata && (
+                              <span className="inline-block mt-1 px-2 py-1 bg-green-600 rounded text-xs">
+                                Completata
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<TorneoArbitri />, document.getElementById('root'));
+  </script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </body>
 </html>
