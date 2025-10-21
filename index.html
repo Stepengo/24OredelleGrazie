@@ -16,8 +16,8 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
 
-        const SUPABASE_URL = 'https://osljgsecgwrwzccmlosp.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zbGpnc2VjZ3dyd3pjY21sb3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4ODE2MjAsImV4cCI6MjA3NjQ1NzYyMH0.gMnDrlZxy3xBjo9u5wWkZS1FMEKMDms8HP2on1p7HNo';
+        const SUPABASE_URL = 'https://bflagmexshprrbigcjzj.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmbGFnbWV4c2hwcnJiaWdjanpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMTk3MDMsImV4cCI6MjA3NTc5NTcwM30.29WDB3dfj9a2jOjTJRT28nQcjMqEXoDdfWXTWMNJbE8';
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         window.supabase = supabase;
@@ -51,8 +51,9 @@
                             nome: row.nome_giocatore
                         });
                     });
+                    console.log('✅ Squadre caricate:', Object.keys(this.squadre).length);
                 } catch (error) {
-                    console.error('Errore caricamento squadre:', error);
+                    console.error('❌ Errore caricamento squadre:', error);
                 }
             },
 
@@ -72,8 +73,9 @@
                     if (rows.length > 0) {
                         await supabase.from('squadre').insert(rows);
                     }
+                    console.log('✅ Squadre salvate');
                 } catch (error) {
-                    console.error('Errore salvataggio squadre:', error);
+                    console.error('❌ Errore salvataggio squadre:', error);
                 }
             },
 
@@ -109,8 +111,9 @@
                     }));
                     
                     this.connesso = true;
+                    console.log('✅ Partite caricate:', this.partite.length);
                 } catch (error) {
-                    console.error('Errore caricamento partite:', error);
+                    console.error('❌ Errore caricamento partite:', error);
                     this.connesso = false;
                 }
             },
@@ -127,37 +130,56 @@
             },
 
             async aggiungiPartita(campo, orario, squadraA, squadraB) {
-                await supabase.from('partite').insert([{
-                    campo, orario,
-                    squadra_a: squadraA, squadra_b: squadraB,
-                    gol_a: [], gol_b: [], scalpi_a: [], scalpi_b: [],
-                    vuoti_a: [], vuoti_b: [], espulsi_a: [], espulsi_b: [],
-                    punteggio_a: 0, punteggio_b: 0,
-                    punti_a: 0, punti_b: 0, mvp_a: '', mvp_b: '',
-                    completata: false
-                }]);
+                try {
+                    const { error } = await supabase.from('partite').insert([{
+                        campo, orario,
+                        squadra_a: squadraA, squadra_b: squadraB,
+                        gol_a: [], gol_b: [], scalpi_a: [], scalpi_b: [],
+                        vuoti_a: [], vuoti_b: [], espulsi_a: [], espulsi_b: [],
+                        punteggio_a: 0, punteggio_b: 0,
+                        punti_a: 0, punti_b: 0, mvp_a: '', mvp_b: '',
+                        completata: false
+                    }]);
+                    if (error) throw error;
+                    console.log('✅ Partita aggiunta');
+                } catch (error) {
+                    console.error('❌ Errore aggiunta partita:', error);
+                    alert('Errore aggiunta partita: ' + error.message);
+                }
             },
 
             async aggiornaPartita(id, updates) {
-                const p = this.partite.find(x => x.id === id);
-                const u = { ...p, ...updates };
-                
-                await supabase.from('partite').update({
-                    squadra_a: u.squadraA, squadra_b: u.squadraB,
-                    gol_a: u.golA, gol_b: u.golB,
-                    scalpi_a: u.scalpiA, scalpi_b: u.scalpiB,
-                    vuoti_a: u.vuotiA, vuoti_b: u.vuotiB,
-                    espulsi_a: u.espulsiA, espulsi_b: u.espulsiB,
-                    punteggio_a: u.punteggioA, punteggio_b: u.punteggioB,
-                    punti_a: u.puntiA, punti_b: u.puntiB,
-                    mvp_a: u.mvpA, mvp_b: u.mvpB,
-                    completata: u.completata
-                }).eq('id', id);
+                try {
+                    const p = this.partite.find(x => x.id === id);
+                    const u = { ...p, ...updates };
+                    
+                    const { error } = await supabase.from('partite').update({
+                        squadra_a: u.squadraA, squadra_b: u.squadraB,
+                        gol_a: u.golA, gol_b: u.golB,
+                        scalpi_a: u.scalpiA, scalpi_b: u.scalpiB,
+                        vuoti_a: u.vuotiA, vuoti_b: u.vuotiB,
+                        espulsi_a: u.espulsiA, espulsi_b: u.espulsiB,
+                        punteggio_a: u.punteggioA, punteggio_b: u.punteggioB,
+                        punti_a: u.puntiA, punti_b: u.puntiB,
+                        mvp_a: u.mvpA, mvp_b: u.mvpB,
+                        completata: u.completata
+                    }).eq('id', id);
+                    
+                    if (error) throw error;
+                } catch (error) {
+                    console.error('❌ Errore aggiornamento partita:', error);
+                }
             },
 
             async eliminaPartita(id) {
                 if (!confirm('Eliminare questa partita?')) return;
-                await supabase.from('partite').delete().eq('id', id);
+                try {
+                    const { error } = await supabase.from('partite').delete().eq('id', id);
+                    if (error) throw error;
+                    console.log('✅ Partita eliminata');
+                } catch (error) {
+                    console.error('❌ Errore eliminazione partita:', error);
+                }
             },
 
             contaVuoti(vuoti, giocatore) {
@@ -180,8 +202,35 @@
                 await this.aggiornaPartita(id, updates);
             },
 
+            aggiungiSquadraManuale() {
+                const nome = prompt('Nome della squadra:');
+                if (!nome) return;
+                
+                const giocatori = [];
+                let continua = true;
+                
+                while (continua) {
+                    const numero = prompt(`Squadra: ${nome}\nNumero maglia (lascia vuoto per terminare):`);
+                    if (!numero) break;
+                    
+                    const nomeGiocatore = prompt(`Squadra: ${nome}\nNome del giocatore n. ${numero}:`);
+                    if (!nomeGiocatore) break;
+                    
+                    giocatori.push({ numero: parseInt(numero), nome: nomeGiocatore });
+                    
+                    continua = confirm('Aggiungere un altro giocatore?');
+                }
+                
+                if (giocatori.length > 0) {
+                    this.squadre[nome] = giocatori;
+                    this.salvaSquadre();
+                    alert(`✅ Squadra "${nome}" aggiunta con ${giocatori.length} giocatori!`);
+                    this.render();
+                }
+            },
+
             importaSquadre() {
-                const url = prompt('Link Google Sheets (Squadra, Numero, Nome):');
+                const url = prompt('Link Google Sheets (3 colonne: Squadra, Numero, Nome):');
                 if (!url) return;
                 
                 let csvUrl = url;
@@ -213,7 +262,63 @@
                             }
                         });
                     })
-                    .catch(() => alert('❌ Errore import.'));
+                    .catch(err => {
+                        alert('❌ Errore import. Verifica che il link sia pubblico.');
+                        console.error(err);
+                    });
+            },
+
+            importaPartite() {
+                const url = prompt('Link Google Sheets partite (colonne: Campo, Orario, SquadraA, SquadraB):');
+                if (!url) return;
+                
+                let csvUrl = url;
+                if (url.includes('/edit')) {
+                    const sheetId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
+                    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                }
+                
+                fetch(csvUrl)
+                    .then(r => r.text())
+                    .then(csv => {
+                        Papa.parse(csv, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: async (results) => {
+                                let importate = 0;
+                                let errori = 0;
+                                
+                                for (const row of results.data) {
+                                    try {
+                                        const campo = parseInt(row.Campo || row.campo || row.CAMPO || '1');
+                                        const orario = row.Orario || row.orario || row.ORARIO || row.Ora || row.ora || '';
+                                        const squadraA = row.SquadraA || row.squadraA || row.SQUADRAA || row['Squadra A'] || row['squadra a'] || '';
+                                        const squadraB = row.SquadraB || row.squadraB || row.SQUADRAB || row['Squadra B'] || row['squadra b'] || '';
+                                        
+                                        if (!squadraA || !squadraB) {
+                                            console.warn('Riga ignorata:', row);
+                                            errori++;
+                                            continue;
+                                        }
+                                        
+                                        await this.aggiungiPartita(campo, orario, squadraA.trim(), squadraB.trim());
+                                        importate++;
+                                        
+                                        await new Promise(resolve => setTimeout(resolve, 100));
+                                    } catch (error) {
+                                        console.error('Errore riga:', row, error);
+                                        errori++;
+                                    }
+                                }
+                                
+                                alert(`✅ Importate ${importate} partite!${errori > 0 ? `\n⚠️ ${errori} errori` : ''}`);
+                            }
+                        });
+                    })
+                    .catch(err => {
+                        alert('❌ Errore import partite.');
+                        console.error(err);
+                    });
             },
 
             calcolaClassifica() {
@@ -319,9 +424,12 @@
                 const lista = Object.keys(this.squadre).sort();
                 document.getElementById('contenuto').innerHTML = `
                     <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
-                        <div class="flex justify-between items-center mb-4">
+                        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
                             <h2 class="text-xl font-semibold text-cyan-400">Gestione Squadre</h2>
-                            <button onclick="app.importaSquadre()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold">📥 Import</button>
+                            <div class="flex gap-2">
+                                <button onclick="app.importaSquadre()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold text-sm">📥 Import</button>
+                                <button onclick="app.aggiungiSquadraManuale()" class="bg-cyan-600 hover:bg-cyan-700 text-white px-4 py-2 rounded font-semibold text-sm">➕ Aggiungi</button>
+                            </div>
                         </div>
                         ${lista.length === 0 ? '<p class="text-center text-gray-500 py-12">Nessuna squadra</p>' : `
                             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -445,7 +553,10 @@
                     </div>
                     
                     <div class="bg-gray-800 rounded-lg p-6 mb-6 shadow-xl border border-gray-700">
-                        <h2 class="text-xl font-semibold text-cyan-400 mb-4">Nuova Partita</h2>
+                        <div class="flex justify-between items-center mb-4 flex-wrap gap-2">
+                            <h2 class="text-xl font-semibold text-cyan-400">Nuova Partita</h2>
+                            <button onclick="app.importaPartite()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold text-sm">📥 Import Partite</button>
+                        </div>
                         <div class="grid grid-cols-1 md:grid-cols-5 gap-4">
                             <div>
                                 <label class="block text-sm mb-2 text-gray-300">Campo</label>
@@ -497,12 +608,15 @@
                 const squadraA = document.getElementById('squadraA').value.trim();
                 const squadraB = document.getElementById('squadraB').value.trim();
                 
-                if (squadraA && squadraB) {
-                    this.aggiungiPartita(campo, orario, squadraA, squadraB);
-                    document.getElementById('squadraA').value = '';
-                    document.getElementById('squadraB').value = '';
-                    document.getElementById('orario').value = '';
+                if (!squadraA || !squadraB) {
+                    alert('⚠️ Seleziona entrambe le squadre!');
+                    return;
                 }
+                
+                this.aggiungiPartita(campo, orario, squadraA, squadraB);
+                document.getElementById('squadraA').value = '';
+                document.getElementById('squadraB').value = '';
+                document.getElementById('orario').value = '';
             },
 
             renderListaPartite() {
