@@ -890,9 +890,8 @@
                             <button onclick="app.eliminaPartita(${p.id})" class="text-red-500 hover:text-red-400">🗑️</button>
                         </div>
                         
-                        <div class="space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                             ${this.renderSquadraPartita(p, 'A')}
-                            <div class="border-t-2 border-cyan-600"></div>
                             ${this.renderSquadraPartita(p, 'B')}
                         </div>
                         
@@ -976,99 +975,95 @@
                 vuoti.forEach(v => vuotiPerGiocatore[v] = (vuotiPerGiocatore[v] || 0) + 1);
                 
                 return `
-                    <div class="bg-gray-700 rounded-lg p-6">
-                        <div class="flex justify-between items-center mb-6">
-                            <h3 class="text-2xl font-bold text-cyan-300">${nome}</h3>
-                            <div class="text-4xl font-bold text-yellow-400">${punteggio}</div>
+                    <div class="bg-gray-700 rounded-lg p-4">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-bold text-cyan-300">${nome}</h3>
+                            <div class="text-2xl font-bold text-yellow-400">${punteggio}</div>
                         </div>
                         
                         ${espulsi.length > 0 ? `
-                            <div class="mb-6 bg-red-900 bg-opacity-30 border-2 border-red-700 rounded-lg p-4">
-                                <div class="flex items-center gap-2 mb-3">
-                                    <span class="text-red-400 text-xl">🚫</span>
-                                    <span class="font-semibold text-red-300 text-lg">Espulsi (${espulsi.length})</span>
+                            <div class="mb-4 bg-red-900 bg-opacity-30 border border-red-700 rounded-lg p-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <span class="text-red-400">🚫</span>
+                                    <span class="font-semibold text-red-300">Espulsi (${espulsi.length})</span>
                                 </div>
                                 ${espulsi.map(e => `
-                                    <div class="flex justify-between items-center bg-red-900 bg-opacity-40 rounded px-4 py-3 mb-2">
-                                        <span class="text-red-200 text-lg font-semibold">${e}</span>
-                                        ${!p.completata ? `<button onclick="app.rientraEspulso(${p.id}, '${squadra}', '${e}')" class="text-green-400 text-sm font-semibold">↩️ Rientra</button>` : ''}
+                                    <div class="flex justify-between items-center bg-red-900 bg-opacity-40 rounded px-3 py-2 text-sm mb-1">
+                                        <span class="text-red-200">${e}</span>
+                                        ${!p.completata ? `<button onclick="app.rientraEspulso(${p.id}, '${squadra}', '${e}')" class="text-green-400 text-xs">↩️ Rientra</button>` : ''}
                                     </div>
                                 `).join('')}
                             </div>
                         ` : ''}
                         
-                        <div class="mb-6">
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="text-yellow-400 text-xl">🏆</span>
-                                <span class="font-bold text-gray-200 text-lg">Gol (${gol.length})</span>
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-yellow-400">🏆</span>
+                                <span class="font-semibold text-gray-200">Gol (${gol.length})</span>
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-3 mb-3">
+                                <div class="flex gap-2 mb-2">
                                     ${giocatori.length > 0 ? `
-                                        <select id="gol-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                        <select id="gol-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
+                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                     `}
-                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'gol')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'gol')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
                             ` : ''}
-                            <div class="space-y-2">
-                                ${gol.map((g, i) => `
-                                    <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3">
-                                        <span class="text-white text-lg font-semibold">${g}</span>
-                                        ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'gol', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
-                                    </div>
-                                `).join('')}
-                            </div>
+                            ${gol.map((g, i) => `
+                                <div class="flex justify-between items-center bg-gray-600 rounded px-3 py-2 text-sm mb-1">
+                                    <span>${g}</span>
+                                    ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'gol', ${i})" class="text-red-400">🗑️</button>` : ''}
+                                </div>
+                            `).join('')}
                         </div>
                         
-                        <div class="mb-6">
-                            <div class="flex items-center gap-2 mb-3">
-                                <span class="text-red-400 text-xl">🎯</span>
-                                <span class="font-bold text-gray-200 text-lg">Scalpi (${scalpi.length})</span>
+                        <div class="mb-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-red-400">🎯</span>
+                                <span class="font-semibold text-gray-200">Scalpi (${scalpi.length})</span>
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-3 mb-3">
+                                <div class="flex gap-2 mb-2">
                                     ${giocatori.length > 0 ? `
-                                        <select id="scalpo-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                        <select id="scalpo-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
+                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                     `}
-                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'scalpo')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'scalpo')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
                             ` : ''}
-                            <div class="space-y-2">
-                                ${scalpi.map((s, i) => `
-                                    <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3">
-                                        <span class="text-white text-lg font-semibold">${s}</span>
-                                        ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'scalpo', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
-                                    </div>
-                                `).join('')}
-                            </div>
+                            ${scalpi.map((s, i) => `
+                                <div class="flex justify-between items-center bg-gray-600 rounded px-3 py-2 text-sm mb-1">
+                                    <span>${s}</span>
+                                    ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'scalpo', ${i})" class="text-red-400">🗑️</button>` : ''}
+                                </div>
+                            `).join('')}
                         </div>
                         
                         <div>
-                            <div class="flex items-center justify-between mb-3">
+                            <div class="flex items-center justify-between mb-2">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-blue-400 text-xl">💨</span>
-                                    <span class="font-bold text-gray-200 text-lg">Vuoti (${vuoti.length})</span>
+                                    <span class="text-blue-400">💨</span>
+                                    <span class="font-semibold text-gray-200">Vuoti (${vuoti.length})</span>
                                 </div>
                                 ${!p.completata && vuoti.length > 0 ? `
-                                    <button onclick="app.azzeraVuoti(${p.id}, '${squadra}')" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded text-sm font-semibold">
+                                    <button onclick="app.azzeraVuoti(${p.id}, '${squadra}')" class="text-xs bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded">
                                         🔄 Azzera 1° T
                                     </button>
                                 ` : ''}
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-3 mb-3">
+                                <div class="flex gap-2 mb-2">
                                     ${giocatori.length > 0 ? `
-                                        <select id="vuoto-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                        <select id="vuoto-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => {
                                                 const giocatoreNome = `${g.numero} - ${g.nome}`;
@@ -1078,26 +1073,9 @@
                                             }).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="vuoto-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
+                                        <input type="text" id="vuoto-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
                                     `}
-                                    <button onclick="app.aggiungiVuotoBtn(${p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
-                                </div>
-                            ` : ''}
-                            <div class="space-y-2">
-                                ${vuoti.map((v, i) => {
-                                    const cnt = vuotiPerGiocatore[v];
-                                    return `
-                                        <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3 ${cnt >= 3 ? 'border-2 border-red-500' : ''}">
-                                            <span class="text-white text-lg font-semibold">${v} ${cnt >= 2 ? `<span class="text-orange-400 font-bold">(${cnt}/3)</span>` : ''}</span>
-                                            ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'vuoto', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
-                                        </div>
-                                    `;
-                                }).join('')}
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
+                                    <button onclick="app.aggiungiVuotoBtn(${p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
                             ` : ''}
                             ${vuoti.map((v, i) => {
