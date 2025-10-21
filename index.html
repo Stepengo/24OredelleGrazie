@@ -22,6 +22,19 @@
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         window.supabase = supabase;
 
+        // ⚠️ WHITELIST ARBITRI AUTORIZZATI - MODIFICA QUI
+        const ARBITRI_AUTORIZZATI = [
+            'stepengo@gmail.com',
+            'arbitro1@24odg.it',
+            'arbitro2@24odg.it',
+            'arbitro3@24odg.it',
+            'arbitro4@24odg.it',
+            'arbitro5@24odg.it',
+        ];
+        
+        // Email di test (rimuovi prima del torneo vero!)
+        const EMAIL_TEST = 'test@24odg.test';
+
         window.app = {
             partite: [],
             squadre: {},
@@ -30,12 +43,139 @@
             sottovista: 'tutte',
             filtroCampo: 'tutti',
             filtroOrario: 'tutti',
+            utenteAutenticato: null,
+            emailUtente: '',
 
             async init() {
+                // Verifica se c'è un utente autenticato
+                const emailSalvata = localStorage.getItem('24odg_email');
+                if (emailSalvata) {
+                    this.utenteAutenticato = emailSalvata;
+                    this.emailUtente = emailSalvata;
+                    console.log('✅ Utente autenticato:', emailSalvata);
+                }
+                
+                // Se non autenticato, mostra login
+                if (!this.utenteAutenticato) {
+                    this.renderLogin();
+                    return;
+                }
+                
                 await this.caricaSquadre();
                 await this.caricaPartite();
                 this.sottoscrivi();
                 this.render();
+            },
+
+            login(email) {
+                // Validazione email
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(email)) {
+                    alert('❌ Email non valida!');
+                    return;
+                }
+                
+                // Normalizza email
+                const emailNormalizzata = email.toLowerCase().trim();
+                
+                // Crea array di email autorizzate (whitelist + test)
+                const emailAutorizzate = [...ARBITRI_AUTORIZZATI, EMAIL_TEST];
+                
+                console.log('🔍 Tentativo login:', emailNormalizzata);
+                console.log('📋 Email autorizzate:', emailAutorizzate);
+                
+                // Controlla whitelist
+                if (!emailAutorizzate.includes(emailNormalizzata)) {
+                    console.warn('❌ Accesso rifiutato:', emailNormalizzata);
+                    alert(`❌ Email non autorizzata!\n\n"${emailNormalizzata}"\n\nContatta l'organizzatore per registrarti.`);
+                    return;
+                }
+                
+                // Salva email nel localStorage
+                localStorage.setItem('24odg_email', emailNormalizzata);
+                this.utenteAutenticato = emailNormalizzata;
+                this.emailUtente = emailNormalizzata;
+                
+                console.log('✅ Accesso effettuato:', emailNormalizzata);
+                alert(`✅ Benvenuto ${emailNormalizzata}!`);
+                
+                // Ricarica app
+                this.init();
+            },
+
+            logout() {
+                if (confirm('Vuoi disconnetterti?')) {
+                    localStorage.removeItem('24odg_email');
+                    this.utenteAutenticato = null;
+                    this.emailUtente = '';
+                    alert('👋 Arrivederci!');
+                    location.reload();
+                }
+            },
+
+            renderLogin() {
+                document.getElementById('app').innerHTML = `
+                    <div class="max-w-6xl mx-auto p-4">
+                        <div class="flex items-center justify-center min-h-screen">
+                            <div class="bg-gray-800 rounded-lg p-8 shadow-xl border border-gray-700 w-full max-w-md">
+                                <div class="text-center mb-6">
+                                    <h1 class="text-3xl font-bold text-cyan-400 mb-2">24OdG</h1>
+                                    <p class="text-gray-400 text-sm">24 Ore di Gabicce - Gestione Torneo</p>
+                                </div>
+                                
+                                <h2 class="text-xl font-bold text-center mb-6 text-white">Accedi all'App</h2>
+                                
+                                <div class="mb-6">
+                                    <label class="block text-sm mb-2 text-gray-300">Email Arbitro</label>
+                                    <input 
+                                        type="email" 
+                                        id="loginEmail" 
+                                        placeholder="arbitro@24odg.it" 
+                                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white focus:outline-none focus:border-cyan-500"
+                                        onkeypress="if(event.key==='Enter') app.handleLogin()"
+                                        autocomplete="email"
+                                    >
+                                </div>
+                                
+                                <button 
+                                    onclick="app.handleLogin()"
+                                    class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded transition mb-4"
+                                >
+                                    🔐 Accedi
+                                </button>
+                                
+                                <p class="text-center text-gray-400 text-sm mt-6 mb-2">Non sei registrato?</p>
+                                <p class="text-center text-gray-500 text-xs mb-6">Contatta l'organizzatore per ricevere i dati di accesso</p>
+                                
+                                <div class="pt-6 border-t border-gray-700">
+                                    <p class="text-gray-400 text-sm mb-2">🧪 Modalità Test:</p>
+                                    <button 
+                                        onclick="app.login('${EMAIL_TEST}')"
+                                        class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-4 rounded transition text-sm"
+                                    >
+                                        Accedi con: ${EMAIL_TEST}
+                                    </button>
+                                </div>
+                                
+                                <div class="mt-6 pt-6 border-t border-gray-700">
+                                    <p class="text-gray-500 text-xs text-center">
+                                        🔒 Solo arbitri autorizzati possono accedere<br>
+                                        📱 I tuoi dati restano nel tuo dispositivo
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },
+
+            handleLogin() {
+                const email = document.getElementById('loginEmail').value.trim();
+                if (email) {
+                    this.login(email);
+                } else {
+                    alert('⚠️ Inserisci la tua email!');
+                }
             },
 
             async caricaSquadre() {
@@ -410,16 +550,24 @@
             },
 
             render() {
+                if (!this.utenteAutenticato) {
+                    this.renderLogin();
+                    return;
+                }
+                
                 const completate = this.partite.filter(p => p.completata).length;
                 
                 document.getElementById('app').innerHTML = `
                     <div class="max-w-6xl mx-auto p-4">
                         <header class="mb-8">
-                            <div class="flex items-center justify-center gap-3 mb-2">
-                                <h1 class="text-3xl font-bold text-cyan-400">24OdG</h1>
-                                <div class="px-3 py-1 rounded-full text-sm ${this.connesso ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
-                                    ${this.connesso ? '🟢 Online' : '🔴 Offline'}
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-3">
+                                    <h1 class="text-3xl font-bold text-cyan-400">24OdG</h1>
+                                    <div class="px-3 py-1 rounded-full text-sm ${this.connesso ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+                                        ${this.connesso ? '🟢 Online' : '🔴 Offline'}
+                                    </div>
                                 </div>
+                                <div class="text-sm text-gray-400">👤 ${this.emailUtente}</div>
                             </div>
                             <p class="text-center text-gray-400">Partite: ${this.partite.length} | Completate: ${completate} | Squadre: ${Object.keys(this.squadre).length}</p>
                         </header>
@@ -429,6 +577,7 @@
                             <button onclick="app.vista='squadre';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'squadre' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">👥 Squadre</button>
                             <button onclick="app.vista='classifica';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">🏆 Classifica</button>
                             <button onclick="app.vista='statistiche';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">📊 Statistiche</button>
+                            <button onclick="app.logout()" class="px-4 py-2 rounded font-semibold whitespace-nowrap bg-red-900 text-red-300 hover:bg-red-800 ml-auto">🚪 Esci</button>
                         </nav>
                         
                         <main id="contenuto"></main>
@@ -741,8 +890,9 @@
                             <button onclick="app.eliminaPartita(${p.id})" class="text-red-500 hover:text-red-400">🗑️</button>
                         </div>
                         
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="space-y-6">
                             ${this.renderSquadraPartita(p, 'A')}
+                            <div class="border-t-2 border-cyan-600"></div>
                             ${this.renderSquadraPartita(p, 'B')}
                         </div>
                         
@@ -826,95 +976,99 @@
                 vuoti.forEach(v => vuotiPerGiocatore[v] = (vuotiPerGiocatore[v] || 0) + 1);
                 
                 return `
-                    <div class="bg-gray-700 rounded-lg p-4">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-bold text-cyan-300">${nome}</h3>
-                            <div class="text-2xl font-bold text-yellow-400">${punteggio}</div>
+                    <div class="bg-gray-700 rounded-lg p-6">
+                        <div class="flex justify-between items-center mb-6">
+                            <h3 class="text-2xl font-bold text-cyan-300">${nome}</h3>
+                            <div class="text-4xl font-bold text-yellow-400">${punteggio}</div>
                         </div>
                         
                         ${espulsi.length > 0 ? `
-                            <div class="mb-4 bg-red-900 bg-opacity-30 border border-red-700 rounded-lg p-3">
-                                <div class="flex items-center gap-2 mb-2">
-                                    <span class="text-red-400">🚫</span>
-                                    <span class="font-semibold text-red-300">Espulsi (${espulsi.length})</span>
+                            <div class="mb-6 bg-red-900 bg-opacity-30 border-2 border-red-700 rounded-lg p-4">
+                                <div class="flex items-center gap-2 mb-3">
+                                    <span class="text-red-400 text-xl">🚫</span>
+                                    <span class="font-semibold text-red-300 text-lg">Espulsi (${espulsi.length})</span>
                                 </div>
                                 ${espulsi.map(e => `
-                                    <div class="flex justify-between items-center bg-red-900 bg-opacity-40 rounded px-3 py-2 text-sm mb-1">
-                                        <span class="text-red-200">${e}</span>
-                                        ${!p.completata ? `<button onclick="app.rientraEspulso(${p.id}, '${squadra}', '${e}')" class="text-green-400 text-xs">↩️ Rientra</button>` : ''}
+                                    <div class="flex justify-between items-center bg-red-900 bg-opacity-40 rounded px-4 py-3 mb-2">
+                                        <span class="text-red-200 text-lg font-semibold">${e}</span>
+                                        ${!p.completata ? `<button onclick="app.rientraEspulso(${p.id}, '${squadra}', '${e}')" class="text-green-400 text-sm font-semibold">↩️ Rientra</button>` : ''}
                                     </div>
                                 `).join('')}
                             </div>
                         ` : ''}
                         
-                        <div class="mb-4">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-yellow-400">🏆</span>
-                                <span class="font-semibold text-gray-200">Gol (${gol.length})</span>
+                        <div class="mb-6">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-yellow-400 text-xl">🏆</span>
+                                <span class="font-bold text-gray-200 text-lg">Gol (${gol.length})</span>
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-2 mb-2">
+                                <div class="flex gap-3 mb-3">
                                     ${giocatori.length > 0 ? `
-                                        <select id="gol-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <select id="gol-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <input type="text" id="gol-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
                                     `}
-                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'gol')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
+                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'gol')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
                                 </div>
                             ` : ''}
-                            ${gol.map((g, i) => `
-                                <div class="flex justify-between items-center bg-gray-600 rounded px-3 py-2 text-sm mb-1">
-                                    <span>${g}</span>
-                                    ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'gol', ${i})" class="text-red-400">🗑️</button>` : ''}
-                                </div>
-                            `).join('')}
+                            <div class="space-y-2">
+                                ${gol.map((g, i) => `
+                                    <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3">
+                                        <span class="text-white text-lg font-semibold">${g}</span>
+                                        ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'gol', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                         
-                        <div class="mb-4">
-                            <div class="flex items-center gap-2 mb-2">
-                                <span class="text-red-400">🎯</span>
-                                <span class="font-semibold text-gray-200">Scalpi (${scalpi.length})</span>
+                        <div class="mb-6">
+                            <div class="flex items-center gap-2 mb-3">
+                                <span class="text-red-400 text-xl">🎯</span>
+                                <span class="font-bold text-gray-200 text-lg">Scalpi (${scalpi.length})</span>
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-2 mb-2">
+                                <div class="flex gap-3 mb-3">
                                     ${giocatori.length > 0 ? `
-                                        <select id="scalpo-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <select id="scalpo-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <input type="text" id="scalpo-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
                                     `}
-                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'scalpo')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
+                                    <button onclick="app.aggiungiElemento(${p.id}, '${squadra}', 'scalpo')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
                                 </div>
                             ` : ''}
-                            ${scalpi.map((s, i) => `
-                                <div class="flex justify-between items-center bg-gray-600 rounded px-3 py-2 text-sm mb-1">
-                                    <span>${s}</span>
-                                    ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'scalpo', ${i})" class="text-red-400">🗑️</button>` : ''}
-                                </div>
-                            `).join('')}
+                            <div class="space-y-2">
+                                ${scalpi.map((s, i) => `
+                                    <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3">
+                                        <span class="text-white text-lg font-semibold">${s}</span>
+                                        ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'scalpo', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
+                                    </div>
+                                `).join('')}
+                            </div>
                         </div>
                         
                         <div>
-                            <div class="flex items-center justify-between mb-2">
+                            <div class="flex items-center justify-between mb-3">
                                 <div class="flex items-center gap-2">
-                                    <span class="text-blue-400">💨</span>
-                                    <span class="font-semibold text-gray-200">Vuoti (${vuoti.length})</span>
+                                    <span class="text-blue-400 text-xl">💨</span>
+                                    <span class="font-bold text-gray-200 text-lg">Vuoti (${vuoti.length})</span>
                                 </div>
                                 ${!p.completata && vuoti.length > 0 ? `
-                                    <button onclick="app.azzeraVuoti(${p.id}, '${squadra}')" class="text-xs bg-orange-600 hover:bg-orange-700 text-white px-2 py-1 rounded">
+                                    <button onclick="app.azzeraVuoti(${p.id}, '${squadra}')" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded text-sm font-semibold">
                                         🔄 Azzera 1° T
                                     </button>
                                 ` : ''}
                             </div>
                             ${!p.completata ? `
-                                <div class="flex gap-2 mb-2">
+                                <div class="flex gap-3 mb-3">
                                     ${giocatori.length > 0 ? `
-                                        <select id="vuoto-${squadra}-${p.id}" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <select id="vuoto-${squadra}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
                                             <option value="">-- Seleziona --</option>
                                             ${giocatori.map(g => {
                                                 const giocatoreNome = `${g.numero} - ${g.nome}`;
@@ -924,9 +1078,26 @@
                                             }).join('')}
                                         </select>
                                     ` : `
-                                        <input type="text" id="vuoto-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border border-gray-500 rounded px-3 py-2 text-white text-sm">
+                                        <input type="text" id="vuoto-${squadra}-${p.id}" placeholder="Nome" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg">
                                     `}
-                                    <button onclick="app.aggiungiVuotoBtn(${p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
+                                    <button onclick="app.aggiungiVuotoBtn(${p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                </div>
+                            ` : ''}
+                            <div class="space-y-2">
+                                ${vuoti.map((v, i) => {
+                                    const cnt = vuotiPerGiocatore[v];
+                                    return `
+                                        <div class="flex justify-between items-center bg-gray-600 rounded px-4 py-3 ${cnt >= 3 ? 'border-2 border-red-500' : ''}">
+                                            <span class="text-white text-lg font-semibold">${v} ${cnt >= 2 ? `<span class="text-orange-400 font-bold">(${cnt}/3)</span>` : ''}</span>
+                                            ${!p.completata ? `<button onclick="app.rimuoviElemento(${p.id}, '${squadra}', 'vuoto', ${i})" class="text-red-400 text-xl">🗑️</button>` : ''}
+                                        </div>
+                                    `;
+                                }).join('')}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            },p.id}, '${squadra}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-3 py-2 rounded">➕</button>
                                 </div>
                             ` : ''}
                             ${vuoti.map((v, i) => {
