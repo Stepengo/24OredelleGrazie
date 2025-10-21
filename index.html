@@ -121,7 +121,15 @@
             sottoscrivi() {
                 supabase.channel('db-changes')
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'partite' }, 
-                        () => this.caricaPartite().then(() => this.render())
+                        async () => {
+                            await this.caricaPartite();
+                            // Aggiorna solo la lista partite se sei nella vista partite
+                            if (this.vista === 'partite') {
+                                this.renderListaPartite();
+                            } else {
+                                this.render();
+                            }
+                        }
                     )
                     .on('postgres_changes', { event: '*', schema: 'public', table: 'squadre' }, 
                         () => this.caricaSquadre().then(() => this.render())
@@ -917,8 +925,15 @@
             },
 
             azzeraVuoti(id, squadra) {
-                if (!confirm(`Azzerare i vuoti del 1° tempo?\n\nGli espulsi NON rientreranno.`)) return;
-                this.aggiornaPartita(id, { [`vuoti${squadra}`]: [] });
+                if (!confirm(`Azzerare i vuoti del 1° tempo?\n\nGli espulsi RIENTRERANNO automaticamente.`)) return;
+                
+                const p = this.partite.find(x => x.id === id);
+                
+                // Azzera sia i vuoti che gli espulsi (rientro automatico)
+                this.aggiornaPartita(id, { 
+                    [`vuoti${squadra}`]: [],
+                    [`espulsi${squadra}`]: []
+                });
             },
 
             rientraEspulso(id, squadra, giocatore) {
