@@ -28,6 +28,8 @@
             connesso: false,
             vista: 'partite',
             sottovista: 'tutte',
+            filtroCampo: 'tutti',
+            filtroOrario: 'tutti',
 
             async init() {
                 await this.caricaSquadre();
@@ -174,6 +176,17 @@
                     }).eq('id', id);
                     
                     if (error) throw error;
+                    
+                    // Aggiorna locale immediatamente
+                    const idx = this.partite.findIndex(x => x.id === id);
+                    if (idx !== -1) {
+                        this.partite[idx] = u;
+                    }
+                    
+                    // Ri-renderizza la lista partite
+                    if (this.vista === 'partite') {
+                        this.renderListaPartite();
+                    }
                 } catch (error) {
                     console.error('❌ Errore aggiornamento partita:', error);
                 }
@@ -604,10 +617,62 @@
                         </div>
                     </div>
                     
+                    <div id="filtriPartite"></div>
                     <div id="listaPartite"></div>
                 `;
                 
+                this.renderFiltriPartite();
                 this.renderListaPartite();
+            },
+
+            renderFiltriPartite() {
+                let partiteFiltrate = this.partite;
+                if (this.sottovista === 'da_giocare') partiteFiltrate = this.partite.filter(p => !p.completata);
+                else if (this.sottovista === 'completate') partiteFiltrate = this.partite.filter(p => p.completata);
+                
+                const campi = [...new Set(partiteFiltrate.map(p => p.campo))].sort((a, b) => a - b);
+                const orari = [...new Set(partiteFiltrate.map(p => p.orario).filter(o => o))].sort();
+                
+                document.getElementById('filtriPartite').innerHTML = `
+                    <div class="bg-gray-800 rounded-lg p-6 mb-6 shadow-xl border border-gray-700">
+                        <h3 class="text-lg font-semibold text-cyan-400 mb-4">🔍 Filtra Partite</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Filtra per Campo</label>
+                                <select id="selectFiltroCampo" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
+                                    <option value="tutti">Tutti i campi</option>
+                                    ${campi.map(c => `<option value="${c}">Campo ${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Filtra per Orario</label>
+                                <select id="selectFiltroOrario" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
+                                    <option value="tutti">Tutti gli orari</option>
+                                    ${orari.map(o => `<option value="${o}">${o}</option>`).join('')}
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                const selectCampo = document.getElementById('selectFiltroCampo');
+                const selectOrario = document.getElementById('selectFiltroOrario');
+                
+                if (selectCampo) {
+                    selectCampo.value = this.filtroCampo;
+                    selectCampo.onchange = (e) => {
+                        this.filtroCampo = e.target.value;
+                        this.renderListaPartite();
+                    };
+                }
+                
+                if (selectOrario) {
+                    selectOrario.value = this.filtroOrario;
+                    selectOrario.onchange = (e) => {
+                        this.filtroOrario = e.target.value;
+                        this.renderListaPartite();
+                    };
+                }
             },
 
             handleAggiungiPartita() {
@@ -632,8 +697,16 @@
                 if (this.sottovista === 'da_giocare') partite = partite.filter(p => !p.completata);
                 else if (this.sottovista === 'completate') partite = partite.filter(p => p.completata);
                 
+                // Applica filtri campo e orario
+                if (this.filtroCampo !== 'tutti') {
+                    partite = partite.filter(p => p.campo === parseInt(this.filtroCampo));
+                }
+                if (this.filtroOrario !== 'tutti') {
+                    partite = partite.filter(p => p.orario === this.filtroOrario);
+                }
+                
                 if (partite.length === 0) {
-                    document.getElementById('listaPartite').innerHTML = '<div class="text-center text-gray-500 py-12">Nessuna partita</div>';
+                    document.getElementById('listaPartite').innerHTML = '<div class="text-center text-gray-500 py-12">Nessuna partita trovata con i filtri selezionati</div>';
                     return;
                 }
                 
