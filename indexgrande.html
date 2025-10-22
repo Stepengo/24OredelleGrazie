@@ -66,7 +66,7 @@
                     this.render();
                 } catch (error) {
                     console.error('Errore init:', error);
-                    document.getElementById('app').innerHTML = '<div class="text-center text-red-400 p-8">Errore caricamento app</div>';
+                    document.getElementById('app').innerHTML = '<div class="text-center text-red-400 p-8">Errore: ' + error.message + '</div>';
                 }
             },
 
@@ -165,6 +165,27 @@
                     });
                 } catch (error) {
                     console.error('Errore squadre:', error);
+                }
+            },
+
+            async salvaSquadre() {
+                try {
+                    await supabase.from('squadre').delete().neq('id', 0);
+                    const rows = [];
+                    Object.keys(this.squadre).forEach(nomeSquadra => {
+                        this.squadre[nomeSquadra].forEach(g => {
+                            rows.push({
+                                nome_squadra: nomeSquadra,
+                                numero: g.numero,
+                                nome_giocatore: g.nome
+                            });
+                        });
+                    });
+                    if (rows.length > 0) {
+                        await supabase.from('squadre').insert(rows);
+                    }
+                } catch (error) {
+                    console.error('Errore salvataggio squadre:', error);
                 }
             },
 
@@ -269,6 +290,42 @@
                 await this.aggiornaPartita(id, updates);
             },
 
+            importaSquadre() {
+                const url = prompt('Link Google Sheets (Squadra, Numero, Nome):');
+                if (!url) return;
+                
+                let csvUrl = url;
+                if (url.includes('/edit')) {
+                    const sheetId = url.match(/\/d\/([a-zA-Z0-9-_]+)/)[1];
+                    csvUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`;
+                }
+                
+                fetch(csvUrl)
+                    .then(r => r.text())
+                    .then(csv => {
+                        Papa.parse(csv, {
+                            header: true,
+                            skipEmptyLines: true,
+                            complete: (results) => {
+                                this.squadre = {};
+                                results.data.forEach(row => {
+                                    const sq = row.Squadra || row.squadra;
+                                    const num = parseInt(row.Numero || row.numero);
+                                    const nome = row.Nome || row.nome;
+                                    if (sq && num && nome) {
+                                        if (!this.squadre[sq]) this.squadre[sq] = [];
+                                        this.squadre[sq].push({ numero: num, nome });
+                                    }
+                                });
+                                this.salvaSquadre();
+                                alert(`✅ Importate ${Object.keys(this.squadre).length} squadre!`);
+                                this.render();
+                            }
+                        });
+                    })
+                    .catch(() => alert('❌ Errore import.'));
+            },
+
             render() {
                 if (!this.utenteAutenticato) {
                     this.renderLogin();
@@ -289,13 +346,15 @@
                                 </div>
                                 <div class="text-sm text-gray-400">${this.emailUtente}</div>
                             </div>
-                            <p class="text-center text-gray-400">Partite: ${this.partite.length} | Completate: ${completate}</p>
+                            <p class="text-center text-gray-400">Partite: ${this.partite.length} | Completate: ${completate} | Squadre: ${Object.keys(this.squadre).length}</p>
                         </header>
                         
                         <nav class="flex gap-2 mb-6 overflow-x-auto pb-2">
-                            <button onclick="app.vista='partite';app.render()" class="px-4 py-2 rounded font-semibold ${this.vista === 'partite' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">📋 Partite</button>
-                            <button onclick="app.vista='classifica';app.render()" class="px-4 py-2 rounded font-semibold ${this.vista === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">🏆 Classifica</button>
-                            <button onclick="app.logout()" class="px-4 py-2 rounded font-semibold bg-red-900 text-red-300 ml-auto">🚪 Esci</button>
+                            <button onclick="app.vista='partite';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'partite' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">📋 Partite</button>
+                            <button onclick="app.vista='squadre';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'squadre' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">👥 Squadre</button>
+                            <button onclick="app.vista='classifica';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">🏆 Classifica</button>
+                            <button onclick="app.vista='statistiche';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">📊 Statistiche</button>
+                            <button onclick="app.logout()" class="px-4 py-2 rounded font-semibold whitespace-nowrap bg-red-900 text-red-300 hover:bg-red-800 ml-auto">🚪 Esci</button>
                         </nav>
                         
                         <main id="contenuto"></main>
@@ -303,23 +362,60 @@
                 `;
                 
                 if (this.vista === 'partite') this.renderPartite();
+                else if (this.vista === 'squadre') this.renderSquadre();
                 else if (this.vista === 'classifica') this.renderClassifica();
+                else if (this.vista === 'statistiche') this.renderStatistiche();
+            },
+
+            renderSquadre() {
+                const lista = Object.keys(this.squadre).sort();
+                document.getElementById('contenuto').innerHTML = `
+                    <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                        <div class="flex justify-between items-center mb-4">
+                            <h2 class="text-xl font-semibold text-cyan-400">Squadre</h2>
+                            <button onclick="app.importaSquadre()" class="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded font-semibold">📥 Import</button>
+                        </div>
+                        ${lista.length === 0 ? '<p class="text-center text-gray-500 py-12">Nessuna squadra</p>' : `
+                            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                ${lista.map(nome => `
+                                    <div class="bg-gray-700 rounded-lg p-4">
+                                        <h3 class="font-bold text-lg text-cyan-300 mb-3">${nome}</h3>
+                                        <div class="space-y-1 max-h-48 overflow-y-auto">
+                                            ${this.squadre[nome].map(g => `
+                                                <div class="text-sm bg-gray-600 rounded px-2 py-1">
+                                                    <span class="font-semibold text-cyan-400">${g.numero}</span> - ${g.nome}
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <div class="mt-2 text-xs text-gray-400">${this.squadre[nome].length} giocatori</div>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        `}
+                    </div>
+                `;
             },
 
             renderPartite() {
                 const daGiocare = this.partite.filter(p => !p.completata);
                 
                 document.getElementById('contenuto').innerHTML = `
-                    <div class="mb-6">
-                        <h3 class="text-lg font-semibold text-cyan-400 mb-4">🔍 Filtra</h3>
+                    <div class="mb-6 bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                        <h3 class="text-lg font-semibold text-cyan-400 mb-4">🔍 Filtra Partite</h3>
                         <div class="grid grid-cols-2 gap-4">
-                            <select id="selectFiltroCampo" class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
-                                <option value="tutti">Tutti i campi</option>
-                                ${[1,2,3,4,5,6,7,8].map(c => `<option value="${c}">Campo ${c}</option>`).join('')}
-                            </select>
-                            <select id="selectFiltroOrario" class="bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
-                                <option value="tutti">Tutti gli orari</option>
-                            </select>
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Campo</label>
+                                <select id="selectFiltroCampo" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
+                                    <option value="tutti">Tutti i campi</option>
+                                    ${[1,2,3,4,5,6,7,8].map(c => `<option value="${c}">Campo ${c}</option>`).join('')}
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm mb-2 text-gray-300">Orario</label>
+                                <select id="selectFiltroOrario" class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-2 text-white">
+                                    <option value="tutti">Tutti gli orari</option>
+                                </select>
+                            </div>
                         </div>
                     </div>
                     
@@ -408,43 +504,47 @@
                         
                         ${espulsi.length > 0 ? `
                             <div class="mb-6 bg-red-900 bg-opacity-30 border-2 border-red-700 rounded-lg p-4">
-                                <div class="text-red-300 font-bold mb-2">🚫 Espulsi</div>
-                                ${espulsi.map(e => `<div class="text-red-200 text-lg">${e}</div>`).join('')}
+                                <div class="text-red-300 font-bold mb-2 text-lg">🚫 Espulsi</div>
+                                ${espulsi.map(e => `<div class="text-red-200 text-lg font-semibold">${e}</div>`).join('')}
                             </div>
                         ` : ''}
                         
                         <div class="mb-6">
                             <div class="text-yellow-400 font-bold text-lg mb-3">🏆 Gol (${gol.length})</div>
                             <div class="flex gap-3 mb-3">
-                                <select id="gol-${sq}-${p.id}" class="flex-1 bg-gray-600 rounded px-4 py-3 text-white text-lg">
-                                    <option value="">Seleziona</option>
+                                <select id="gol-${sq}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                    <option value="">Seleziona giocatore</option>
                                     ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                 </select>
-                                <button onclick="app.aggiungiGol(${p.id}, '${sq}')" class="bg-cyan-600 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                <button onclick="app.aggiungiGol(${p.id}, '${sq}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
                             </div>
-                            ${gol.map((g, i) => `<div class="bg-gray-600 rounded px-4 py-3 mb-2 text-lg">${g}</div>`).join('')}
+                            <div class="space-y-2">
+                                ${gol.map(g => `<div class="bg-gray-600 rounded px-4 py-3 text-lg font-semibold text-white">${g}</div>`).join('')}
+                            </div>
                         </div>
                         
                         <div class="mb-6">
                             <div class="text-red-400 font-bold text-lg mb-3">🎯 Scalpi (${scalpi.length})</div>
                             <div class="flex gap-3 mb-3">
-                                <select id="scalpo-${sq}-${p.id}" class="flex-1 bg-gray-600 rounded px-4 py-3 text-white text-lg">
-                                    <option value="">Seleziona</option>
+                                <select id="scalpo-${sq}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                    <option value="">Seleziona giocatore</option>
                                     ${giocatori.map(g => `<option value="${g.numero} - ${g.nome}">${g.numero} - ${g.nome}</option>`).join('')}
                                 </select>
-                                <button onclick="app.aggiungiScalpo(${p.id}, '${sq}')" class="bg-cyan-600 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                <button onclick="app.aggiungiScalpo(${p.id}, '${sq}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
                             </div>
-                            ${scalpi.map(s => `<div class="bg-gray-600 rounded px-4 py-3 mb-2 text-lg">${s}</div>`).join('')}
+                            <div class="space-y-2">
+                                ${scalpi.map(s => `<div class="bg-gray-600 rounded px-4 py-3 text-lg font-semibold text-white">${s}</div>`).join('')}
+                            </div>
                         </div>
                         
                         <div>
                             <div class="flex justify-between items-center mb-3">
                                 <div class="text-blue-400 font-bold text-lg">💨 Vuoti (${vuoti.length})</div>
-                                ${vuoti.length > 0 ? `<button onclick="app.azzeraVuoti(${p.id}, '${sq}')" class="bg-orange-600 text-white px-3 py-2 rounded text-sm">🔄 Azzera</button>` : ''}
+                                ${vuoti.length > 0 ? `<button onclick="app.azzeraVuoti(${p.id}, '${sq}')" class="bg-orange-600 hover:bg-orange-700 text-white px-3 py-2 rounded text-sm font-semibold">🔄 Azzera 1°T</button>` : ''}
                             </div>
                             <div class="flex gap-3 mb-3">
-                                <select id="vuoto-${sq}-${p.id}" class="flex-1 bg-gray-600 rounded px-4 py-3 text-white text-lg">
-                                    <option value="">Seleziona</option>
+                                <select id="vuoto-${sq}-${p.id}" class="flex-1 bg-gray-600 border-2 border-gray-500 rounded px-4 py-3 text-white text-lg font-semibold">
+                                    <option value="">Seleziona giocatore</option>
                                     ${giocatori.map(g => {
                                         const nome = `${g.numero} - ${g.nome}`;
                                         const cnt = vuotiPerGiocatore[nome] || 0;
@@ -452,12 +552,14 @@
                                         return `<option value="${nome}" ${esp ? 'disabled' : ''}>${nome}${cnt > 0 ? ` (${cnt})` : ''}${esp ? ' [ESP]' : ''}</option>`;
                                     }).join('')}
                                 </select>
-                                <button onclick="app.aggiungiVuotoBtn(${p.id}, '${sq}')" class="bg-cyan-600 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
+                                <button onclick="app.aggiungiVuotoBtn(${p.id}, '${sq}')" class="bg-cyan-600 hover:bg-cyan-700 text-white px-6 py-3 rounded text-xl font-bold">➕</button>
                             </div>
-                            ${vuoti.map(v => {
-                                const cnt = vuotiPerGiocatore[v];
-                                return `<div class="bg-gray-600 rounded px-4 py-3 mb-2 text-lg ${cnt >= 3 ? 'border-2 border-red-500' : ''}">${v} ${cnt >= 2 ? `<span class="text-orange-400">(${cnt}/3)</span>` : ''}</div>`;
-                            }).join('')}
+                            <div class="space-y-2">
+                                ${vuoti.map(v => {
+                                    const cnt = vuotiPerGiocatore[v];
+                                    return `<div class="bg-gray-600 rounded px-4 py-3 text-lg font-semibold text-white ${cnt >= 3 ? 'border-2 border-red-500' : ''}">${v} ${cnt >= 2 ? `<span class="text-orange-400">(${cnt}/3)</span>` : ''}</div>`;
+                                }).join('')}
+                            </div>
                         </div>
                     </div>
                 `;
@@ -517,7 +619,7 @@
                 this.partite.filter(p => p.completata).forEach(p => {
                     [p.squadraA, p.squadraB].forEach((sq, idx) => {
                         if (!cls[sq]) {
-                            cls[sq] = { nome: sq, punti: 0, giocate: 0, vinte: 0, golFatti: 0, golSubiti: 0 };
+                            cls[sq] = { nome: sq, punti: 0, giocate: 0, vinte: 0, pareggiate: 0, perse: 0, golFatti: 0, golSubiti: 0 };
                         }
                         const s = cls[sq];
                         s.giocate++;
@@ -526,34 +628,139 @@
                             s.golFatti += p.punteggioA;
                             s.golSubiti += p.punteggioB;
                             if (p.punteggioA > p.punteggioB) s.vinte++;
+                            else if (p.punteggioA === p.punteggioB) s.pareggiate++;
+                            else s.perse++;
                         } else {
                             s.punti += p.puntiB;
                             s.golFatti += p.punteggioB;
                             s.golSubiti += p.punteggioA;
                             if (p.punteggioB > p.punteggioA) s.vinte++;
+                            else if (p.punteggioA === p.punteggioB) s.pareggiate++;
+                            else s.perse++;
                         }
                     });
                 });
                 
                 const classifica = Object.values(cls).sort((a, b) => {
                     if (b.punti !== a.punti) return b.punti - a.punti;
-                    return (b.golFatti - b.golSubiti) - (a.golFatti - a.golSubiti);
+                    const da = a.golFatti - a.golSubiti;
+                    const db = b.golFatti - b.golSubiti;
+                    if (db !== da) return db - da;
+                    return b.golFatti - a.golFatti;
                 });
                 
+                if (classifica.length === 0) {
+                    document.getElementById('contenuto').innerHTML = '<div class="text-center text-gray-500 py-12">Nessuna partita completata</div>';
+                    return;
+                }
+                
                 document.getElementById('contenuto').innerHTML = `
-                    <div class="bg-gray-800 rounded-lg p-6">
-                        <h2 class="text-2xl font-bold text-cyan-400 mb-4">🏆 Classifica</h2>
-                        ${classifica.length === 0 ? '<p class="text-gray-500">Nessuna partita completata</p>' : `
-                            ${classifica.map((s, i) => `
-                                <div class="flex justify-between items-center bg-gray-700 rounded px-4 py-3 mb-2">
+                    <div class="bg-gray-800 rounded-lg shadow-xl border border-gray-700 overflow-hidden">
+                        <div class="overflow-x-auto">
+                            <table class="w-full">
+                                <thead class="bg-gray-700">
+                                    <tr>
+                                        <th class="px-4 py-3 text-left text-cyan-400 font-semibold">Pos</th>
+                                        <th class="px-4 py-3 text-left text-cyan-400 font-semibold">Squadra</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">Pt</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">G</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">V</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">N</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">P</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">GF</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">GS</th>
+                                        <th class="px-4 py-3 text-center text-cyan-400 font-semibold">DR</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${classifica.map((s, i) => `
+                                        <tr class="border-t border-gray-700 ${i < 3 ? 'bg-green-900 bg-opacity-20' : ''}">
+                                            <td class="px-4 py-3 font-bold ${i === 0 ? 'text-yellow-400' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-orange-400' : 'text-gray-400'}">${i + 1}</td>
+                                            <td class="px-4 py-3 font-semibold">${s.nome}</td>
+                                            <td class="px-4 py-3 text-center font-bold text-cyan-400">${s.punti}</td>
+                                            <td class="px-4 py-3 text-center">${s.giocate}</td>
+                                            <td class="px-4 py-3 text-center text-green-400">${s.vinte}</td>
+                                            <td class="px-4 py-3 text-center text-yellow-400">${s.pareggiate}</td>
+                                            <td class="px-4 py-3 text-center text-red-400">${s.perse}</td>
+                                            <td class="px-4 py-3 text-center">${s.golFatti}</td>
+                                            <td class="px-4 py-3 text-center">${s.golSubiti}</td>
+                                            <td class="px-4 py-3 text-center font-semibold ${s.golFatti - s.golSubiti > 0 ? 'text-green-400' : s.golFatti - s.golSubiti < 0 ? 'text-red-400' : ''}">${s.golFatti - s.golSubiti > 0 ? '+' : ''}${s.golFatti - s.golSubiti}</td>
+                                        </tr>
+                                    `).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            },
+
+            renderStatistiche() {
+                const marcatori = {}, scalpiatori = {}, vuotatori = {}, mvps = {};
+                
+                this.partite.forEach(p => {
+                    ['A', 'B'].forEach(sq => {
+                        const squadra = p[`squadra${sq}`];
+                        p[`gol${sq}`].forEach(g => {
+                            const key = `${g} (${squadra})`;
+                            marcatori[key] = (marcatori[key] || 0) + 1;
+                        });
+                        p[`scalpi${sq}`].forEach(s => {
+                            const key = `${s} (${squadra})`;
+                            scalpiatori[key] = (scalpiatori[key] || 0) + 1;
+                        });
+                        p[`vuoti${sq}`].forEach(v => {
+                            const key = `${v} (${squadra})`;
+                            vuotatori[key] = (vuotatori[key] || 0) + 1;
+                        });
+                        if (p[`mvp${sq}`]) {
+                            const key = `${p[`mvp${sq}`]} (${squadra})`;
+                            mvps[key] = (mvps[key] || 0) + 1;
+                        }
+                    });
+                });
+                
+                const stats = {
+                    marcatori: Object.entries(marcatori).map(([nome, gol]) => ({ nome, gol })).sort((a, b) => b.gol - a.gol),
+                    scalpiatori: Object.entries(scalpiatori).map(([nome, scalpi]) => ({ nome, scalpi })).sort((a, b) => b.scalpi - a.scalpi),
+                    vuotatori: Object.entries(vuotatori).map(([nome, vuoti]) => ({ nome, vuoti })).sort((a, b) => b.vuoti - a.vuoti),
+                    mvps: Object.entries(mvps).map(([nome, volte]) => ({ nome, volte })).sort((a, b) => b.volte - a.volte)
+                };
+                
+                const renderLista = (lista, colorBg) => {
+                    if (lista.length === 0) return '<p class="text-gray-500">Nessun dato</p>';
+                    return `
+                        <div class="space-y-2">
+                            ${lista.slice(0, 10).map((item, i) => `
+                                <div class="flex justify-between items-center bg-gray-700 rounded px-4 py-3">
                                     <div class="flex items-center gap-3">
-                                        <span class="font-bold text-lg ${i === 0 ? 'text-yellow-400' : 'text-gray-400'}">${i + 1}</span>
-                                        <span class="text-white font-semibold">${s.nome}</span>
+                                        <span class="font-bold ${i === 0 ? 'text-yellow-400 text-lg' : i === 1 ? 'text-gray-300' : i === 2 ? 'text-orange-400' : 'text-gray-400'}">${i + 1}</span>
+                                        <span class="text-white">${item.nome}</span>
                                     </div>
-                                    <span class="text-cyan-400 font-bold">${s.punti} pt</span>
+                                    <span class="${colorBg} px-3 py-1 rounded-full font-bold">${item.gol || item.scalpi || item.vuoti || item.volte}${item.volte ? 'x' : ''}</span>
                                 </div>
                             `).join('')}
-                        `}
+                        </div>
+                    `;
+                };
+                
+                document.getElementById('contenuto').innerHTML = `
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                            <h2 class="text-xl font-semibold mb-4 text-cyan-400">🏆 Marcatori</h2>
+                            ${renderLista(stats.marcatori, 'bg-cyan-900 text-cyan-300')}
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                            <h2 class="text-xl font-semibold mb-4 text-cyan-400">🎯 Scalpi</h2>
+                            ${renderLista(stats.scalpiatori, 'bg-red-900 text-red-300')}
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                            <h2 class="text-xl font-semibold mb-4 text-cyan-400">💨 Vuoti</h2>
+                            ${renderLista(stats.vuotatori, 'bg-blue-900 text-blue-300')}
+                        </div>
+                        <div class="bg-gray-800 rounded-lg p-6 shadow-xl border border-gray-700">
+                            <h2 class="text-xl font-semibold mb-4 text-cyan-400">⭐ MVP</h2>
+                            ${renderLista(stats.mvps, 'bg-purple-900 text-purple-300')}
+                        </div>
                     </div>
                 `;
             }
