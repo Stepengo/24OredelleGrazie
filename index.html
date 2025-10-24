@@ -16,8 +16,8 @@
     <script type="module">
         import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/+esm';
 
-        const SUPABASE_URL = 'https://osljgsecgwrwzccmlosp.supabase.co';
-        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9zbGpnc2VjZ3dyd3pjY21sb3NwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjA4ODE2MjAsImV4cCI6MjA3NjQ1NzYyMH0.gMnDrlZxy3xBjo9u5wWkZS1FMEKMDms8HP2on1p7HNo';
+        const SUPABASE_URL = 'https://bflagmexshprrbigcjzj.supabase.co';
+        const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJmbGFnbWV4c2hwcnJiaWdjanpqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjAyMTk3MDMsImV4cCI6MjA3NTc5NTcwM30.29WDB3dfj9a2jOjTJRT28nQcjMqEXoDdfWXTWMNJbE8';
 
         const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
         window.supabase = supabase;
@@ -47,135 +47,10 @@
             emailUtente: '',
 
             async init() {
-                // Verifica se c'è un utente autenticato
-                const emailSalvata = localStorage.getItem('24odg_email');
-                if (emailSalvata) {
-                    this.utenteAutenticato = emailSalvata;
-                    this.emailUtente = emailSalvata;
-                    console.log('✅ Utente autenticato:', emailSalvata);
-                }
-                
-                // Se non autenticato, mostra login
-                if (!this.utenteAutenticato) {
-                    this.renderLogin();
-                    return;
-                }
-                
                 await this.caricaSquadre();
                 await this.caricaPartite();
                 this.sottoscrivi();
                 this.render();
-            },
-
-            login(email) {
-                // Validazione email
-                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-                if (!emailRegex.test(email)) {
-                    alert('❌ Email non valida!');
-                    return;
-                }
-                
-                // Normalizza email
-                const emailNormalizzata = email.toLowerCase().trim();
-                
-                // Crea array di email autorizzate (whitelist + test)
-                const emailAutorizzate = [...ARBITRI_AUTORIZZATI, EMAIL_TEST];
-                
-                console.log('🔍 Tentativo login:', emailNormalizzata);
-                console.log('📋 Email autorizzate:', emailAutorizzate);
-                
-                // Controlla whitelist
-                if (!emailAutorizzate.includes(emailNormalizzata)) {
-                    console.warn('❌ Accesso rifiutato:', emailNormalizzata);
-                    alert(`❌ Email non autorizzata!\n\n"${emailNormalizzata}"\n\nContatta l'organizzatore per registrarti.`);
-                    return;
-                }
-                
-                // Salva email nel localStorage
-                localStorage.setItem('24odg_email', emailNormalizzata);
-                this.utenteAutenticato = emailNormalizzata;
-                this.emailUtente = emailNormalizzata;
-                
-                console.log('✅ Accesso effettuato:', emailNormalizzata);
-                alert(`✅ Benvenuto ${emailNormalizzata}!`);
-                
-                // Ricarica app
-                this.init();
-            },
-
-            logout() {
-                if (confirm('Vuoi disconnetterti?')) {
-                    localStorage.removeItem('24odg_email');
-                    this.utenteAutenticato = null;
-                    this.emailUtente = '';
-                    alert('👋 Arrivederci!');
-                    location.reload();
-                }
-            },
-
-            renderLogin() {
-                document.getElementById('app').innerHTML = `
-                    <div class="max-w-6xl mx-auto p-4">
-                        <div class="flex items-center justify-center min-h-screen">
-                            <div class="bg-gray-800 rounded-lg p-8 shadow-xl border border-gray-700 w-full max-w-md">
-                                <div class="text-center mb-6">
-                                    <h1 class="text-3xl font-bold text-cyan-400 mb-2">24OdG</h1>
-                                    <p class="text-gray-400 text-sm">24 Ore di Gabicce - Gestione Torneo</p>
-                                </div>
-                                
-                                <h2 class="text-xl font-bold text-center mb-6 text-white">Accedi all'App</h2>
-                                
-                                <div class="mb-6">
-                                    <label class="block text-sm mb-2 text-gray-300">Email Arbitro</label>
-                                    <input 
-                                        type="email" 
-                                        id="loginEmail" 
-                                        placeholder="arbitro@24odg.it" 
-                                        class="w-full bg-gray-700 border border-gray-600 rounded px-4 py-3 text-white focus:outline-none focus:border-cyan-500"
-                                        onkeypress="if(event.key==='Enter') app.handleLogin()"
-                                        autocomplete="email"
-                                    >
-                                </div>
-                                
-                                <button 
-                                    onclick="app.handleLogin()"
-                                    class="w-full bg-cyan-600 hover:bg-cyan-700 text-white font-bold py-3 px-4 rounded transition mb-4"
-                                >
-                                    🔐 Accedi
-                                </button>
-                                
-                                <p class="text-center text-gray-400 text-sm mt-6 mb-2">Non sei registrato?</p>
-                                <p class="text-center text-gray-500 text-xs mb-6">Contatta l'organizzatore per ricevere i dati di accesso</p>
-                                
-                                <div class="pt-6 border-t border-gray-700">
-                                    <p class="text-gray-400 text-sm mb-2">🧪 Modalità Test:</p>
-                                    <button 
-                                        onclick="app.login('${EMAIL_TEST}')"
-                                        class="w-full bg-gray-700 hover:bg-gray-600 text-gray-300 font-semibold py-2 px-4 rounded transition text-sm"
-                                    >
-                                        Accedi con: ${EMAIL_TEST}
-                                    </button>
-                                </div>
-                                
-                                <div class="mt-6 pt-6 border-t border-gray-700">
-                                    <p class="text-gray-500 text-xs text-center">
-                                        🔒 Solo arbitri autorizzati possono accedere<br>
-                                        📱 I tuoi dati restano nel tuo dispositivo
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            },
-
-            handleLogin() {
-                const email = document.getElementById('loginEmail').value.trim();
-                if (email) {
-                    this.login(email);
-                } else {
-                    alert('⚠️ Inserisci la tua email!');
-                }
             },
 
             async caricaSquadre() {
@@ -550,24 +425,16 @@
             },
 
             render() {
-                if (!this.utenteAutenticato) {
-                    this.renderLogin();
-                    return;
-                }
-                
                 const completate = this.partite.filter(p => p.completata).length;
                 
                 document.getElementById('app').innerHTML = `
                     <div class="max-w-6xl mx-auto p-4">
                         <header class="mb-8">
-                            <div class="flex items-center justify-between mb-2">
-                                <div class="flex items-center gap-3">
-                                    <h1 class="text-3xl font-bold text-cyan-400">24OdG</h1>
-                                    <div class="px-3 py-1 rounded-full text-sm ${this.connesso ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
-                                        ${this.connesso ? '🟢 Online' : '🔴 Offline'}
-                                    </div>
+                            <div class="flex items-center justify-center gap-3 mb-2">
+                                <h1 class="text-3xl font-bold text-cyan-400">24OdG</h1>
+                                <div class="px-3 py-1 rounded-full text-sm ${this.connesso ? 'bg-green-900 text-green-300' : 'bg-red-900 text-red-300'}">
+                                    ${this.connesso ? '🟢 Online' : '🔴 Offline'}
                                 </div>
-                                <div class="text-sm text-gray-400">👤 ${this.emailUtente}</div>
                             </div>
                             <p class="text-center text-gray-400">Partite: ${this.partite.length} | Completate: ${completate} | Squadre: ${Object.keys(this.squadre).length}</p>
                         </header>
@@ -577,7 +444,6 @@
                             <button onclick="app.vista='squadre';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'squadre' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">👥 Squadre</button>
                             <button onclick="app.vista='classifica';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'classifica' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">🏆 Classifica</button>
                             <button onclick="app.vista='statistiche';app.render()" class="px-4 py-2 rounded font-semibold whitespace-nowrap ${this.vista === 'statistiche' ? 'bg-cyan-600 text-white' : 'bg-gray-700 text-gray-300'}">📊 Statistiche</button>
-                            <button onclick="app.logout()" class="px-4 py-2 rounded font-semibold whitespace-nowrap bg-red-900 text-red-300 hover:bg-red-800 ml-auto">🚪 Esci</button>
                         </nav>
                         
                         <main id="contenuto"></main>
